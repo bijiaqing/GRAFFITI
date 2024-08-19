@@ -20,7 +20,7 @@ const int NUM_PAR = 1e+07;
 const int RES_X = 100;
 const int RES_Y = 100;
 const int RES_Z = 100;
-const int KNN_SIZE = 10;
+const int KNN_SIZE = 25;
 
 const real X_MIN = 0.0;
 const real X_MAX = 1.0;
@@ -30,13 +30,14 @@ const real Z_MIN = 0.0;
 const real Z_MAX = 1.0;
 
 const int  OUTPUT_NUM = 100;
-const real OUTPUT_INT = 1.0;
+const real OUTPUT_INT = 0.1;
 const real DT_MAX = 1.0e-03;
 
-const real M_DUST = 1.0;
-const real SIZE_REF = 1.0e-10;
-const real LAMBDA_REF = 1.0e-22;
-const real MAX_QUERY_DIST = 0.05;
+const real M_DUST = 1.0e27;
+// const real BOOST_Q = 0.25;
+const real SIZE_REF = 1.0;
+const real LAMBDA_REF = 1.0e-19; // this is the lambda(qj, qk) in beutel & dullemond 2023
+const real MAX_QUERY_DIST = 0.1;
 
 const int THREADS_PER_BLOCK = 32;
 const int NUM_DIM = RES_X*RES_Y*RES_Z;
@@ -72,26 +73,6 @@ struct tree_traits
 };
 
 __host__
-void rand_gaussian (real *profile, int number, real p_min, real p_max, real p_0, real sigma)
-{
-    int i = 0;
-    real random_x, random_y;
-    std::uniform_real_distribution <real> random(0.0, 1.0);
-
-    while (i < number)
-    {
-        random_x = p_min + (p_max - p_min)*random(rand_generator);
-        random_y =                         random(rand_generator);
-        
-        if (random_y <= std::exp(-(random_x - p_0)*(random_x - p_0)/(2.0*sigma*sigma)))
-        {	
-            profile[i] = random_x;
-            i++;
-        }
-    }
-}
-
-__host__
 void rand_uniform (real *profile, int number, real p_min, real p_max)
 {
     std::uniform_real_distribution <real> random(0.0, 1.0);
@@ -113,10 +94,19 @@ void particle_init (swarm *dev_particle, real *dev_profile_x, real *dev_profile_
         dev_particle[idx].position.y = dev_profile_y[idx];
         dev_particle[idx].position.z = dev_profile_z[idx];
 
+        // int idx_z = static_cast<int>((idx) / 1.0e+5);
+        // int idx_y = static_cast<int>((idx - 1.0e+5*idx_z) / 1.0e3);
+        // int idx_x = static_cast<int>((idx - 1.0e+5*idx_z - 1.0e3*idx_y) / 1.0e1);
+        // int idx_i = idx % 10;
+        
+        // dev_particle[idx].position.x = X_MIN + (idx_x + 0.1*idx_i + 0.05)*(X_MAX - X_MIN) / RES_X / RES_X;
+        // dev_particle[idx].position.y = Y_MIN + (idx_y + 0.1*idx_i + 0.05)*(Y_MAX - Y_MIN) / RES_Y / RES_Y;
+        // dev_particle[idx].position.z = Z_MIN + (idx_z + 0.1*idx_i + 0.05)*(Z_MAX - Z_MIN) / RES_Z / RES_Z;
+
         real size = SIZE_REF;
 
         dev_particle[idx].dustsize = size;
-        dev_particle[idx].numgrain = M_DUST / NUM_PAR / size / size / size; // test
+        dev_particle[idx].numgrain = M_DUST / NUM_PAR / size / size / size; // 1e27 * 1e-7 = 1e20
         dev_particle[idx].collrate = 0.0;
     }
 }
@@ -147,13 +137,6 @@ void save_bin_file (std::ofstream &bin_file, swarm *data, int number)
     bin_file.close();
 }
 
-__host__
-void save_bin_file (std::ofstream &bin_file, real *data, int number) 
-{
-    bin_file.write((char*)data, sizeof(real)*number);
-    bin_file.close();
-}
-
 __global__
 void treenode_init (swarm *dev_particle, tree *dev_treenode)
 {
@@ -169,7 +152,29 @@ void treenode_init (swarm *dev_particle, tree *dev_treenode)
 }
 
 __global__
-void collrate_init (real *dev_collrate, real *dev_collrand, real *dev_collreal)
+void parstate_init (curandState *dev_rngstate_par)
+{
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if (idx >= 0 && idx < NUM_PAR)
+    {
+        curand_init(0, idx, 0, &dev_rngstate_par[idx]);
+    }
+}
+
+__global__
+void dimstate_init (curandState *dev_rngstate_dim)
+{
+    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if (idx >= 0 && idx < NUM_DIM)
+    {
+        curand_init(1, idx, 0, &dev_rngstate_dim[idx]);
+    }
+}
+
+__global__
+void collrate_init (real *dev_collrate, real *dev_collrand, real *dev_collreal, int *dev_collrate_max)
 {
     int idx = threadIdx.x + blockDim.x*blockIdx.x;
 
@@ -178,70 +183,45 @@ void collrate_init (real *dev_collrate, real *dev_collrand, real *dev_collreal)
         dev_collrate[idx] = 0.0;
         dev_collrand[idx] = 0.0;
         dev_collreal[idx] = 0.0;
-    }
-}
 
-__global__
-void dustdens_init (real *dev_dustdens)
-{
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
-
-    if (idx >= 0 && idx < NUM_DIM)
-    {
-        dev_dustdens[idx] = 0.0;
-    }
-}
-
-__global__
-void dustdens_calc (swarm *dev_particle, real *dev_dustdens)
-{
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
-
-    if (idx >= 0 && idx < NUM_PAR)
-    {
-        int idx_x = static_cast<int>(RES_X*(dev_particle[idx].position.x - X_MIN) / (X_MAX - X_MIN));
-        int idx_y = static_cast<int>(RES_Y*(dev_particle[idx].position.y - Y_MIN) / (Y_MAX - Y_MIN));
-        int idx_z = static_cast<int>(RES_Z*(dev_particle[idx].position.z - Z_MIN) / (Z_MAX - Z_MIN));
-
-        atomicAdd(&dev_dustdens[idx_z*RES_Y*RES_X + idx_y*RES_X + idx_x], 1.0);
+        if (idx == 0) *dev_collrate_max = 0.0;
     }
 }
 
 __global__
 void collrate_calc (swarm *dev_particle, tree *dev_treenode, real *dev_collrate, const cukd::box_t<float3> *dev_boundbox)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx_tree = threadIdx.x + blockDim.x*blockIdx.x;
 
-    if (idx >= 0 && idx < NUM_PAR)
+    if (idx_tree >= 0 && idx_tree < NUM_PAR)
     {
         using candidatelist = cukd::HeapCandidateList<KNN_SIZE>;
         candidatelist query_result(static_cast<float>(MAX_QUERY_DIST));
-        cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_treenode[idx].xyz, *dev_boundbox, dev_treenode, NUM_PAR);
+        cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_treenode[idx_tree].xyz, *dev_boundbox, dev_treenode, NUM_PAR);
 
         real collrate_ij = 0.0; // collision rate between particle i and j
         real collrate_i  = 0.0; // total collision rate for particle i
 
-        int tmp_idx;
-        int idx_old_1 = dev_treenode[idx].index_old;
-        int idx_old_2;
+        int idx_old_1 = dev_treenode[idx_tree].index_old;
+        int idx_old_2, idx_tmp;
 
         for(int j = 0; j < KNN_SIZE; j++)
         {
             collrate_ij = 0.0;
-            tmp_idx  = query_result.returnIndex(j);
+            idx_tmp = query_result.returnIndex(j);
 
-            if (tmp_idx != -1)
+            if (idx_tmp != -1)
             {
-                idx_old_2 = dev_treenode[tmp_idx].index_old;
+                idx_old_2 = dev_treenode[idx_tmp].index_old;
                 collrate_ij = LAMBDA_REF*dev_particle[idx_old_2].numgrain;
             }
 
             collrate_i += collrate_ij;
         }
 
-        int idx_x = static_cast<int>(RES_X*(dev_particle[idx].position.x - X_MIN) / (X_MAX - X_MIN));
-        int idx_y = static_cast<int>(RES_Y*(dev_particle[idx].position.y - Y_MIN) / (Y_MAX - Y_MIN));
-        int idx_z = static_cast<int>(RES_Z*(dev_particle[idx].position.z - Z_MIN) / (Z_MAX - Z_MIN));
+        int idx_x = static_cast<int>(RES_X*(dev_particle[idx_old_1].position.x - X_MIN) / (X_MAX - X_MIN));
+        int idx_y = static_cast<int>(RES_Y*(dev_particle[idx_old_1].position.y - Y_MIN) / (Y_MAX - Y_MIN));
+        int idx_z = static_cast<int>(RES_Z*(dev_particle[idx_old_1].position.z - Z_MIN) / (Z_MAX - Z_MIN));
 
         dev_particle[idx_old_1].collrate = collrate_i;
         atomicAdd(&dev_collrate[idx_z*RES_Y*RES_X + idx_y*RES_X + idx_x], collrate_i);
@@ -260,19 +240,19 @@ void collrate_peak (real *dev_collrate, int *dev_collrate_max)
 }
 
 __global__
-void collflag_calc (real *dev_collrate, real *dev_collrand, int *dev_collflag, real *dev_timestep, curandState *dev_rngstate)
+void collflag_calc (real *dev_collrate, real *dev_collrand, int *dev_collflag, real *dev_timestep, curandState *dev_rngstate_dim)
 {
     int idx = threadIdx.x + blockDim.x*blockIdx.x;
 
     if (idx >= 0 && idx < NUM_DIM)
     {
-        real rand_collide = curand_uniform_double(&dev_rngstate[idx]); // (0,1]
+        real rand_collide = curand_uniform_double(&dev_rngstate_dim[idx]); // (0,1]
         real real_collide = (*dev_timestep)*dev_collrate[idx];
 
         if (real_collide >= rand_collide)
         {
             dev_collflag[idx] = 1;
-            dev_collrand[idx] = real_collide*curand_uniform_double(&dev_rngstate[idx]);
+            dev_collrand[idx] = dev_collrate[idx]*curand_uniform_double(&dev_rngstate_dim[idx]);
         }
         else
         {
@@ -283,13 +263,13 @@ void collflag_calc (real *dev_collrate, real *dev_collrand, int *dev_collflag, r
 
 __global__
 void dustcoag_calc (swarm *dev_particle, tree *dev_treenode, int *dev_collflag, real *dev_collrand, real *dev_collreal,
-    const cukd::box_t<float3> *dev_boundbox, curandState *dev_rngstate)
+    const cukd::box_t<float3> *dev_boundbox, curandState *dev_rngstate_par)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx_tree = threadIdx.x + blockDim.x*blockIdx.x;
 
-    if (idx >= 0 && idx < NUM_PAR)
+    if (idx_tree >= 0 && idx_tree < NUM_PAR)
     {
-        int idx_old_1 = dev_treenode[idx].index_old;
+        int idx_old_1 = dev_treenode[idx_tree].index_old;
         
         int idx_x = static_cast<int>(RES_X*(dev_particle[idx_old_1].position.x - X_MIN) / (X_MAX - X_MIN));
         int idx_y = static_cast<int>(RES_Y*(dev_particle[idx_old_1].position.y - Y_MIN) / (Y_MAX - Y_MIN));
@@ -307,23 +287,20 @@ void dustcoag_calc (swarm *dev_particle, tree *dev_treenode, int *dev_collflag, 
             {
                 using candidatelist = cukd::HeapCandidateList<KNN_SIZE>;
                 candidatelist query_result(static_cast<float>(MAX_QUERY_DIST));
-                cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_treenode[idx].xyz, *dev_boundbox, dev_treenode, NUM_PAR);
+                cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_treenode[idx_tree].xyz, *dev_boundbox, dev_treenode, NUM_PAR);
 
-                int tmp_idx = query_result.returnIndex(0);
-                int idx_old_2;
+                int idx_old_2, idx_tmp, idx_knn = 0;
 
-                real rand_collide_ij = collrate_i*curand_uniform_double(&dev_rngstate[idx_old_1]);
+                real rand_collide_ij = collrate_i*curand_uniform_double(&dev_rngstate_par[idx_old_1]);
                 real real_collide_ij = 0.0;
-
-                int idx_knn = 0;
 
                 while (real_collide_ij < rand_collide_ij && idx_knn < KNN_SIZE)
                 {
-                    tmp_idx = query_result.returnIndex(idx_knn);
+                    idx_tmp = query_result.returnIndex(idx_knn);
 
-                    if (tmp_idx != -1)
+                    if (idx_tmp != -1)
                     {
-                        idx_old_2 = dev_treenode[tmp_idx].index_old;
+                        idx_old_2 = dev_treenode[idx_tmp].index_old;
                         real_collide_ij += LAMBDA_REF*dev_particle[idx_old_2].numgrain;
                     }
 
@@ -335,8 +312,8 @@ void dustcoag_calc (swarm *dev_particle, tree *dev_treenode, int *dev_collflag, 
                 real size_2 = dev_particle[idx_old_2].dustsize;
                 real size_3 = cbrt(size_1*size_1*size_1 + size_2*size_2*size_2);
 
-                dev_particle[idx_old_1].dustsize = size_3;
-                dev_particle[idx_old_1].numgrain = dev_particle[idx_old_1].numgrain*(size_1/size_3)*(size_1/size_3)*(size_1/size_3);
+                dev_particle[idx_old_1].dustsize  = size_3;
+                dev_particle[idx_old_1].numgrain *= (size_1/size_3)*(size_1/size_3)*(size_1/size_3);
             }
         }
     }
@@ -354,11 +331,6 @@ int main ()
     swarm *particle, *dev_particle;
     cudaMallocHost((void**)&particle, sizeof(swarm)*NUM_PAR);
     cudaMalloc((void**)&dev_particle, sizeof(swarm)*NUM_PAR);
-
-    real *dustdens, *dev_dustdens;
-
-    cudaMallocHost((void**)&dustdens, sizeof(real)*NUM_DIM);
-    cudaMalloc((void**)&dev_dustdens, sizeof(real)*NUM_DIM);
 
     tree *dev_treenode;
     cudaMalloc((void**)&dev_treenode, sizeof(tree)*NUM_PAR);
@@ -383,8 +355,9 @@ int main ()
     cudaMallocHost((void**)&collrate, sizeof(real)*NUM_DIM);
     cudaMalloc((void**)&dev_collrate, sizeof(real)*NUM_DIM);
 
-    curandState *dev_rngstate;
-    cudaMalloc((void**)&dev_rngstate, sizeof(curandState)*NUM_PAR);
+    curandState *dev_rngstate_par, *dev_rngstate_dim;
+    cudaMalloc((void**)&dev_rngstate_par, sizeof(curandState)*NUM_PAR);
+    cudaMalloc((void**)&dev_rngstate_dim, sizeof(curandState)*NUM_DIM);
 
     cukd::box_t<float3> *dev_boundbox;
     cudaMalloc((void**)&dev_boundbox, sizeof(cukd::box_t<float3>));
@@ -400,10 +373,6 @@ int main ()
     cudaMalloc((void**)&dev_profile_z, sizeof(real)*NUM_PAR);
 
     rand_generator.seed(1);
-
-    // rand_gaussian (profile_x, NUM_PAR, X_MIN, X_MAX, 0.5*(X_MAX - X_MIN), 0.5*(X_MAX - X_MIN));
-    // rand_gaussian (profile_y, NUM_PAR, Y_MIN, Y_MAX, 0.5*(Y_MAX - Y_MIN), 0.5*(Y_MAX - Y_MIN));
-    // rand_gaussian (profile_z, NUM_PAR, Z_MIN, Z_MAX, 0.5*(Z_MAX - Z_MIN), 0.5*(Z_MAX - Z_MIN));
 
     rand_uniform (profile_x, NUM_PAR, X_MIN, X_MAX);
     rand_uniform (profile_y, NUM_PAR, Y_MIN, Y_MAX);
@@ -424,16 +393,11 @@ int main ()
     open_bin_file(ofile, fname);
     save_bin_file(ofile, particle, NUM_PAR);
 
-    dustdens_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_dustdens);
-    dustdens_calc <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_dustdens);
-
-    cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*NUM_DIM, cudaMemcpyDeviceToHost);
-    fname = OUTPUT_PATH + "dustdens_" + frame_num(0, 5) + ".bin";
-    open_bin_file(ofile, fname);
-    save_bin_file(ofile, dustdens, NUM_DIM);
-
     treenode_init <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_treenode);
     cukd::buildTree <tree, tree_traits> (dev_treenode, NUM_PAR, dev_boundbox);
+
+    parstate_init <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_rngstate_par);
+    dimstate_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_rngstate_dim);
 
     std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::cout << std::setw(3) << std::setfill('0') << 0 << "/" << std::setw(3) << std::setfill('0') << OUTPUT_NUM << " finished on " << std::ctime(&end_time);
@@ -442,18 +406,19 @@ int main ()
     {
         while (output_timer < OUTPUT_INT)
         {
-            collrate_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_collrate, dev_collrand, dev_collreal);
+            collrate_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_collrate, dev_collrand, dev_collreal, dev_collrate_max);
             collrate_calc <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_treenode, dev_collrate, dev_boundbox);
             collrate_peak <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_collrate, dev_collrate_max);
 
             cudaMemcpy(collrate_max, dev_collrate_max, sizeof(int), cudaMemcpyDeviceToHost);
-            *timestep = -std::log(1.0 - random(rand_generator)) / static_cast<real>(*collrate_max);
-            if (*timestep > DT_MAX) *timestep = DT_MAX;
+            // *timestep = -std::log(1.0 - random(rand_generator)) / static_cast<real>(*collrate_max);
+            *timestep = 1.0 / static_cast<real>(*collrate_max);
+            // if (*timestep > DT_MAX) *timestep = DT_MAX;
             if (*timestep > OUTPUT_INT - output_timer) *timestep = OUTPUT_INT - output_timer;
             cudaMemcpy(dev_timestep, timestep, sizeof(real), cudaMemcpyHostToDevice);
-
-            collflag_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_collrate, dev_collrand, dev_collflag, dev_timestep, dev_rngstate);
-            dustcoag_calc <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_treenode, dev_collflag, dev_collrand, dev_collreal, dev_boundbox, dev_rngstate);
+            
+            collflag_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_collrate, dev_collrand, dev_collflag, dev_timestep, dev_rngstate_dim);
+            dustcoag_calc <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_treenode, dev_collflag, dev_collrand, dev_collreal, dev_boundbox, dev_rngstate_par);
 
             timer += *timestep;
             output_timer += *timestep;
@@ -463,7 +428,6 @@ int main ()
     
         output_timer = 0.0;
         
-        // cudaDeviceSynchronize();
         cudaMemcpy(particle, dev_particle, sizeof(swarm)*NUM_PAR, cudaMemcpyDeviceToHost);
         fname = OUTPUT_PATH + "particle_" + frame_num(i, 5) + ".par";
         open_bin_file(ofile, fname);
