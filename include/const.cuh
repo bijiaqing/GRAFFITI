@@ -6,16 +6,16 @@
 
 #include "cukd/builder.h"                   // for cukd::get_coord
 
-using real  = double;
-using real3 = double3;
-using boxf  = cukd::box_t<float3>;
+using real  = double;                       // code real type
+using real3 = double3;                      // double3 is a built-in CUDA type
+using boxf  = cukd::box_t<float3>;          // boxf is an axis-aligned bounding box type in cukd
 
 // =========================================================================================================================
 // code units
 
-const real  G           = 1.0;
-const real  M_S         = 1.0;
-const real  R_0         = 1.0;
+const real  G           = 1.0;              // gravitational constant
+const real  M_S         = 1.0;              // mass of the central star
+const real  R_0         = 1.0;              // reference radius
 
 // =========================================================================================================================
 // gas paramters
@@ -49,34 +49,34 @@ const float MAX_DIST = 0.05;                // the maximum distance for neighbor
 // =========================================================================================================================
 // mesh domain size and resolution
 
-const int   N_PAR         = 1e+07;            // total number of super-particles in the model
+const int   N_PAR         = 1e+07;          // total number of super-particles in the model
 
-const int   N_X         = 1;
-const real  X_MIN       = M_PI;
-const real  X_MAX       = M_PI;
+const int   N_X         = 1;                // number of grid cells in X direction (azimuth)
+const real  X_MIN       = M_PI;             // minimum X boundary (azimuth)
+const real  X_MAX       = M_PI;             // maximum X boundary (azimuth)
 
-const int   N_Y         = 100;
-const real  Y_MIN       = 1.0;
-const real  Y_MAX       = 3.0;
+const int   N_Y         = 100;              // number of grid cells in Y direction (radius)
+const real  Y_MIN       = 1.0;              // minimum Y boundary (radius)
+const real  Y_MAX       = 3.0;              // maximum Y boundary (radius)
 
-const int   N_Z         = 1;
-const real  Z_MIN       = 0.5*M_PI;
-const real  Z_MAX       = 0.5*M_PI;
+const int   N_Z         = 1;                // number of grid cells in Z direction (colattitude)
+const real  Z_MIN       = 0.5*M_PI;         // minimum Z boundary (colattitude)
+const real  Z_MAX       = 0.5*M_PI;         // maximum Z boundary (colattitude)
 
 // =========================================================================================================================
 // dust initialization parameters
 
-const real INIT_XMIN    = X_MIN;
-const real INIT_XMAX    = X_MAX;
+const real INIT_XMIN    = X_MIN;            // minimum X boundary for particle initialization
+const real INIT_XMAX    = X_MAX;            // maximum X boundary for particle initialization
 
-const real INIT_YMIN    = Y_MIN;
-const real INIT_YMAX    = Y_MAX;
+const real INIT_YMIN    = Y_MIN;            // minimum Y boundary for particle initialization
+const real INIT_YMAX    = Y_MAX;            // maximum Y boundary for particle initialization
 
-const real INIT_ZMIN    = Z_MIN;
-const real INIT_ZMAX    = Z_MAX;
+const real INIT_ZMIN    = Z_MIN;            // minimum Z boundary for particle initialization
+const real INIT_ZMAX    = Z_MAX;            // maximum Z boundary for particle initialization
 
-const real INIT_SMIN    = 0.01;
-const real INIT_SMAX    = 10.0;
+const real INIT_SMIN    = 0.01;             // minimum grain size for particle initialization
+const real INIT_SMAX    = 10.0;             // maximum grain size for particle initialization
 
 // =========================================================================================================================
 // time step and output parameters
@@ -92,7 +92,7 @@ const std::string PATH_FILESAVE = "outputs/";
 // =========================================================================================================================
 // structures
 
-struct swarm
+struct swarm        // for particle swarm
 {
     real3   position;                       // x = azimuth [radian], y = radius [R_0], z = colattitude [radian]
     real3   velocity;                       // velocity for rad but specific angular momentum for azi and col
@@ -101,46 +101,46 @@ struct swarm
     real    col_rate;                       // total collision rate for the particle i
 };
 
-struct tree
+struct tree         // for cukd::builder
 {
-    float3  cartesian;                      // xyz position of a tree node
+    float3  cartesian;                      // xyz position of a tree node in Cartesian coordinate
     int     index_old;                      // index of the partile before index shuffling by the KD-tree builder
-    int     split_dim;                      // parameter for the KD-tree builder
+    int     split_dim;                      // splitting dimension of the tree node
 };
 
-struct tree_traits
+struct tree_traits  // for cukd::builder
 {
     using point_t = float3;
     enum { has_explicit_dim = true };
     
+    // getter and setter functions
     static inline __host__ __device__ const point_t &get_point (const tree &node) { return node.cartesian; }
     static inline __host__ __device__ float get_coord (const tree &node, int dim) { return cukd::get_coord(node.cartesian, dim); }
     static inline __host__ __device__ int get_dim (const tree &node) { return node.split_dim; }
     static inline __host__ __device__ void set_dim (tree &node, int dim) { node.split_dim = dim; }
 };
 
-struct interp
+struct interp       // used in _linear_interp_cent in mesh.cu
 {
-    int  next_x, next_y, next_z;
-    real frac_x, frac_y, frac_z;
+    int  next_x, next_y, next_z;            // indices of the next grid cell in each direction
+    real frac_x, frac_y, frac_z;            // fractional distance to the next grid cell in each direction
 };
 
-enum GridFieldType
+enum GridFieldType  // used in _particle_to_grid_core in mesh.cu
 { 
-    OPTDEPTH,   // optical depth field
-    DUSTDENS,   // dust density field
+    OPTDEPTH,                               // optical depth field
+    DUSTDENS,                               // dust density field
 };
 
 // =========================================================================================================================
 // cuda numerical parameters
 
-const int THREADS_PER_BLOCK = 32;
+const int THREADS_PER_BLOCK = 32;               // number of threads per block
 
-// number of grid cells
-const int N_GRD = N_X*N_Y*N_Z;
-const int NG_XY = N_X*N_Y;
-const int NG_XZ = N_X*N_Z;
-const int NG_YZ = N_Y*N_Z;
+const int N_GRD = N_X*N_Y*N_Z;                  // total number of grid cells
+const int NG_XY = N_X*N_Y;                      // number of grid cells in X-Y plane
+const int NG_XZ = N_X*N_Z;                      // number of grid cells in X-Z plane
+const int NG_YZ = N_Y*N_Z;                      // number of grid cells in Y-Z plane
 
 const int NB_P = N_PAR / THREADS_PER_BLOCK + 1; // number of blocks for swarm-level parallelization
 const int NB_A = N_GRD / THREADS_PER_BLOCK + 1; // number of blocks for cell-level  parallelization

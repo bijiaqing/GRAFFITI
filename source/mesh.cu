@@ -29,7 +29,7 @@ void dustdens_init (real *dev_dustdens)
 // =========================================================================================================================
 
 template <GridFieldType field_type> __device__
-void particle_to_grid_core(real *dev_grid, swarm *dev_particle, int idx)
+void _particle_to_grid_core(real *dev_grid, swarm *dev_particle, int idx)
 {
     real loc_x = (N_X > 1) ? (static_cast<real>(N_X) *    (dev_particle[idx].position.x - X_MIN) /     (X_MAX - X_MIN)) : 0.0;
     real loc_y = (N_Y > 1) ? (static_cast<real>(N_Y) * log(dev_particle[idx].position.y / Y_MIN) /  log(Y_MAX / Y_MIN)) : 0.0;
@@ -91,8 +91,8 @@ void optdepth_enum (real *dev_optdepth, swarm *dev_particle)
 
     if (idx < N_PAR)
     {
-        particle_to_grid_core<OPTDEPTH>(dev_optdepth, dev_particle, idx);
-    } 
+        _particle_to_grid_core<OPTDEPTH>(dev_optdepth, dev_particle, idx);
+    }
 }
 
 __global__
@@ -102,14 +102,14 @@ void dustdens_enum (real *dev_dustdens, swarm *dev_particle)
 
     if (idx < N_PAR)
     {
-        particle_to_grid_core<DUSTDENS>(dev_dustdens, dev_particle, idx);
-    } 
+        _particle_to_grid_core<DUSTDENS>(dev_dustdens, dev_particle, idx);
+    }
 }
 
 // =========================================================================================================================
 
 __device__
-void grid_indices (int idx, int &idx_x, int &idx_y, int &idx_z)
+void _grid_indices (int idx, int &idx_x, int &idx_y, int &idx_z)
 {
     idx_x = idx % N_X;
     idx_y = (idx % NG_XY - idx_x) / N_X;
@@ -117,7 +117,7 @@ void grid_indices (int idx, int &idx_x, int &idx_y, int &idx_z)
 }
 
 __device__
-void grid_volume (int idx_y, int idx_z, real &vol_x, real &vol_y, real &vol_z)
+void _grid_volume (int idx_y, int idx_z, real &vol_x, real &vol_y, real &vol_z)
 {
     real dx = (X_MAX - X_MIN) / static_cast<real>(N_X);
     real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
@@ -144,10 +144,10 @@ void optdepth_calc (real *dev_optdepth)
     if (idx < N_GRD)
     {	
         int idx_x, idx_y, idx_z;
-        grid_indices(idx, idx_x, idx_y, idx_z);
+        _grid_indices(idx, idx_x, idx_y, idx_z);
 
         real vol_x, vol_y, vol_z;
-        grid_volume(idx_y, idx_z, vol_x, vol_y, vol_z);
+        _grid_volume(idx_y, idx_z, vol_x, vol_y, vol_z);
 
         dev_optdepth[idx] /= vol_x*vol_y*vol_z;
         
@@ -166,10 +166,10 @@ void dustdens_calc (real *dev_dustdens)
     if (idx < N_GRD)
     {	
         int idx_x, idx_y, idx_z;
-        grid_indices(idx, idx_x, idx_y, idx_z);
+        _grid_indices(idx, idx_x, idx_y, idx_z);
 
         real vol_x, vol_y, vol_z;
-        grid_volume(idx_y, idx_z, vol_x, vol_y, vol_z);
+        _grid_volume(idx_y, idx_z, vol_x, vol_y, vol_z);
 
         dev_dustdens[idx] /= vol_x*vol_y*vol_z;
     }

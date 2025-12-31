@@ -240,7 +240,7 @@ void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par)
         {
             dev_particle[idx].position.y = bigR + delta_R;
         }
-        else
+        else // Y-direction must exist
         {
             dev_particle[idx].position.y = sqrt((bigR + delta_R)*(bigR + delta_R) + (bigZ + delta_Z)*(bigZ + delta_Z));
             dev_particle[idx].position.z = atan2(bigR + delta_R, bigZ + delta_Z);

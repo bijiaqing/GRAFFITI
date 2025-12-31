@@ -31,7 +31,7 @@ real _col_rate_ij (swarm *dev_particle, int idx_old_i, int idx_old_j)
     // constant kernel
     real col_rate_ij = LAMBDA_0*dev_particle[idx_old_j].par_numr;
     
-    // // linear kernel
+    // linear kernel
     // real size_i = dev_particle[idx_old_i].par_size;
     // real size_j = dev_particle[idx_old_j].par_size;
     // real col_rate_ij = LAMBDA_0*RHO_0*(size_i*size_i*size_i + size_j*size_j*size_j);
