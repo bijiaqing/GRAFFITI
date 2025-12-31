@@ -18,20 +18,19 @@ void rand_uniform (real *profile, int number, real p_min, real p_max)
 __host__
 void rand_gaussian (real *profile, int number, real p_min, real p_max, real p_0, real sigma)
 {
-    int i = 0;
-    real random_x, random_y;
-    std::uniform_real_distribution <real> random(0.0, 1.0);
+    std::normal_distribution <real> random(p_0, sigma);
 
-    while (i < number)
+    for (int i = 0; i < number; i++)
     {
-        random_x = p_min + (p_max - p_min)*random(rand_generator);
-        random_y =                         random(rand_generator);
+        real value;
         
-        if (random_y <= std::exp(-(random_x - p_0)*(random_x - p_0)/(2.0*sigma*sigma)))
-        {	
-            profile[i] = random_x;
-            i++;
-        }
+        do
+        {
+            value = random(rand_generator);
+        } 
+        while (value < p_min || value > p_max);
+        
+        profile[i] = value;
     }
 }
 
@@ -40,11 +39,10 @@ void rand_gaussian (real *profile, int number, real p_min, real p_max, real p_0,
 __host__
 void rand_pow_law (real *profile, int number, real p_min, real p_max, real idx_pow)
 {
-    real tmp_min, tmp_max;
     std::uniform_real_distribution <real> random(0.0, 1.0);
 
-    tmp_min = std::pow(p_min, idx_pow + 1.0);
-    tmp_max = std::pow(p_max, idx_pow + 1.0);
+    real tmp_min = std::pow(p_min, idx_pow + 1.0);
+    real tmp_max = std::pow(p_max, idx_pow + 1.0);
 
     // check https://mathworld.wolfram.com/RandomNumber.html for derivations
     // NOTE: this is the probability distribution function dN(x) ~ x^n*dx
@@ -84,57 +82,55 @@ void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_p
 {
     // a convolved (i.e., smoothed) power-law profile
     
-    int n = 0;
-
     // x_min and x_max define the hard boundary of the smoothed profile
     // p_min and p_max define the domain that is not too much smoothed
     real p_min = x_min + smooth;
     real p_max = x_max - smooth;
     
-    real par_x = 0.0;
-    real dec_x = 0.0;
-    real y_max = 0.0;
-
-    real rand_x, x_axis[bins];
-    real rand_y, y_axis[bins];
-
-    std::uniform_real_distribution <real> random(0.0, 1.0);
-
-    for (int i = 0; i < bins; i++)
+    // Build x-axis and compute convolved profile
+    std::vector<real> x_axis(bins + 1);
+    std::vector<real> y_axis(bins + 1, 0.0);
+    
+    real dx = (x_max - x_min) / static_cast<real>(bins);
+    
+    for (int i = 0; i < bins + 1; i++)
     {
-        x_axis[i] = x_min + (static_cast<real>(i) / static_cast<real>(bins - 1))*(x_max - x_min);
-        y_axis[i] = 0.0;
+        x_axis[i] = x_min + i*dx;
     }
 
-    for (int j = 0; j < bins; j++)
+    // Convolve tapered power law with Gaussian kernel
+    for (int j = 0; j < bins + 1; j++)
     {
-        for (int k = 0; k < bins; k++)
+        for (int k = 0; k < bins + 1; k++)
         {
             y_axis[k] += tapered_pow(x_axis[j], p_min, p_max, idx_pow)*gaussian(x_axis[k], x_axis[j], 0.5*smooth);
         }
     }
 
-    // find the peak of the rand_r profile
-    for (int m = 0; m < bins; m++)
+    // Find peak for rejection sampling
+    real y_max = *std::max_element(y_axis.begin(), y_axis.end());
+
+    // Generate random numbers via rejection sampling
+    std::uniform_real_distribution<real> random(0.0, 1.0);
+    
+    real rand_x, rand_y, frac_x, real_y;
+    
+    int idx;
+    
+    for (int n = 0; n < number; n++)
     {
-        if (y_axis[m] > y_max)
+        do
         {
-            y_max = y_axis[m];
+            rand_x = x_min + (x_max - x_min)*random(rand_generator);
+            rand_y = y_max                  *random(rand_generator);
+            
+            // Linear interpolation of y_axis at rand_x
+            idx = static_cast<int>((rand_x - x_min) / dx);
+            frac_x = (rand_x - x_min) / dx - idx;
+            real_y = (1.0 - frac_x)*y_axis[idx] + frac_x*y_axis[idx + 1];
         }
-    }
-
-    while (n < number) 
-    {
-        rand_x = x_min + (x_max - x_min)*random(rand_generator);
-        rand_y = y_max                  *random(rand_generator);
-
-        par_x = (rand_x - x_min) / ((x_max - x_min) / static_cast<real>(bins - 1));
-        dec_x = par_x - std::floor(par_x);
-
-        if (rand_y <= (1.0 - dec_x)*y_axis[static_cast<int>(par_x)] + dec_x*y_axis[static_cast<int>(par_x) + 1])
-        {	
-            profile[n] = rand_x;
-            n++;
-        }
+        while (rand_y > real_y); // only accept if under the curve
+        
+        profile[n] = rand_x;
     }
 }
