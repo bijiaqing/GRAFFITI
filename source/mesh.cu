@@ -56,10 +56,10 @@ void optdepth_enum (real *dev_optdepth, swarm *dev_particle)
 
             int idx_cell = static_cast<int>(par_col)*NUM_COL + static_cast<int>(par_rad)*RES_AZI + static_cast<int>(par_azi);
 
-            real dustsize = dev_particle[idx].dustsize;
-            real numgrain = dev_particle[idx].numgrain;
+            real grain_size = dev_particle[idx].grain_size;
+            real grain_numr = dev_particle[idx].grain_numr;
             
-            real weight = KAPPA_REF*SIZE_REF*RHO_DUST*numgrain*dustsize*dustsize;
+            real weight = KAPPA_REF*SIZE_REF*RHO_DUST*grain_numr*grain_size*grain_size;
 
             atomicAdd(&dev_optdepth[idx_cell                                 ], (1.0-frac_azi)*(1.0-frac_rad)*(1.0-frac_col)*weight);
             atomicAdd(&dev_optdepth[idx_cell + next_azi                      ],      frac_azi *(1.0-frac_rad)*(1.0-frac_col)*weight);
@@ -101,10 +101,10 @@ void dustdens_enum (real *dev_dustdens, swarm *dev_particle)
 
             int idx_cell = static_cast<int>(par_col)*NUM_COL + static_cast<int>(par_rad)*RES_AZI + static_cast<int>(par_azi);
 
-            real dustsize = dev_particle[idx].dustsize;
-            real numgrain = dev_particle[idx].numgrain;
+            real grain_size = dev_particle[idx].grain_size;
+            real grain_numr = dev_particle[idx].grain_numr;
 
-            real weight = RHO_DUST*numgrain*dustsize*dustsize*dustsize;
+            real weight = RHO_DUST*grain_numr*grain_size*grain_size*grain_size;
 
             atomicAdd(&dev_dustdens[idx_cell                                 ], (1.0-frac_azi)*(1.0-frac_rad)*(1.0-frac_col)*weight);
             atomicAdd(&dev_dustdens[idx_cell + next_azi                      ],      frac_azi *(1.0-frac_rad)*(1.0-frac_col)*weight);
@@ -121,7 +121,7 @@ void dustdens_enum (real *dev_dustdens, swarm *dev_particle)
 // =========================================================================================================================
 
 __device__
-real get_optdepth (real *dev_optdepth, real par_azi, real par_rad, real par_col)
+real _get_optdepth (real *dev_optdepth, real par_azi, real par_rad, real par_col)
 {
     real optdepth = 0.0;
 
@@ -225,7 +225,7 @@ void dustdens_calc (real *dev_dustdens)
 // =========================================================================================================================
 
 __global__
-void optdepth_rint (real *dev_optdepth)
+void optdepth_inte (real *dev_optdepth)
 {
     int idx = threadIdx.x + blockDim.x*blockIdx.x;
 

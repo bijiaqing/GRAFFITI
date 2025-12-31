@@ -63,7 +63,7 @@ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth, real *dev_timestep)
         l_azi_i = dev_particle[idx].velocity.x;
         v_rad_i = dev_particle[idx].velocity.y;
         l_col_i = dev_particle[idx].velocity.z;
-        size    = dev_particle[idx].dustsize;
+        size    = dev_particle[idx].grain_size;
 
         real dt = *dev_timestep;
 
@@ -71,22 +71,22 @@ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth, real *dev_timestep)
         real bigZ_1 = rad_1*cos(col_1);
 
         // get the velocity of gas in the hydrostatic equilibrium state
-        eta_1 = (IDX_SIGG + IDX_TEMP - 1.0)*ASP_REF*ASP_REF*pow(bigR_1 / RAD_REF, IDX_TEMP + 1.0) + IDX_TEMP*(1.0 - bigR_1 / rad_1); 
+        eta_1 = (IDX_SIGMAG + IDX_TEMP - 1.0)*H_REF*H_REF*pow(bigR_1 / RAD_REF, IDX_TEMP + 1.0) + IDX_TEMP*(1.0 - bigR_1 / rad_1); 
         lg_azi_1 = sqrt(G*M_STAR*bigR_1)*sqrt(1.0 + eta_1);
         vg_rad_1 = 0.0;
         lg_col_1 = 0.0;
 
         // calculate the stopping time and the dimensionless time
         ts_1  = ST_REF*(size / SIZE_REF) / sqrt(G*M_STAR / RAD_REF / RAD_REF / RAD_REF);
-        ts_1 *= pow(bigR_1 / RAD_REF, - 0.5*IDX_TEMP - IDX_SIGG + 1.0); // correct for radial gas density and sound speed
-        ts_1 *= exp(bigZ_1*bigZ_1 / (2.0*ASP_REF*ASP_REF*bigR_1*bigR_1*pow(bigR_1 / RAD_REF, IDX_TEMP + 1.0))); // correct for vertical gas density
+        ts_1 *= pow(bigR_1 / RAD_REF, - 0.5*IDX_TEMP - IDX_SIGMAG + 1.0); // correct for radial gas density and sound speed
+        ts_1 *= exp(bigZ_1*bigZ_1 / (2.0*H_REF*H_REF*bigR_1*bigR_1*pow(bigR_1 / RAD_REF, IDX_TEMP + 1.0))); // correct for vertical gas density
         tau_1 = dt / ts_1;
 
         // retrieve the optical depth of the particle based on its position and calculate beta
         par_azi  = static_cast<real>(RES_AZI)*   (azi_1 - AZI_MIN) /    (AZI_MAX - AZI_MIN);
         par_rad  = static_cast<real>(RES_RAD)*log(rad_1 / RAD_MIN) / log(RAD_MAX / RAD_MIN);
         par_col  = static_cast<real>(RES_COL)*   (col_1 - COL_MIN) /    (COL_MAX - COL_MIN);
-        optdepth = get_optdepth(dev_optdepth, par_azi, par_rad, par_col);
+        optdepth = _get_optdepth(dev_optdepth, par_azi, par_rad, par_col);
         beta_1   = 1.0 - BETA_REF*exp(-optdepth) / (size / SIZE_REF);
 
         // calculate the forces and torques (using the updated position but outdated velocity)

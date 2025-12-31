@@ -11,9 +11,9 @@ DEPS = $(patsubst %, $(IDIR)/%, $(_DEPS))
 _OBJ = collision.o initialize.o integrator.o interpolate.o main.o mesh.o outputs.o profiles.o 
 OBJ = $(patsubst %, $(ODIR)/%, $(_OBJ))
 
-all: cudust
+all: cuDust
 
-cudust: $(OBJ)
+cuDust: $(OBJ)
 	$(CC) -o $@ $^
 
 $(ODIR)/collision.o: $(SDIR)/collision.cu $(DEPS)
@@ -41,5 +41,5 @@ $(ODIR)/profiles.o: $(SDIR)/profiles.cu $(DEPS)
 	$(CC) --device-c -o $@ $< $(CFLAGS)
 
 clean:
-	rm cudust outputs/* $(OBJ)
+	rm cuDust outputs/* $(OBJ)
 

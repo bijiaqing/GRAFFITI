@@ -47,7 +47,7 @@ void rand_powerlaw (real *profile, int number, real p_min, real p_max, real idx_
     tmp_max = std::pow(p_max, idx_pow + 1.0);
 
     // check https://mathworld.wolfram.com/RandomNumber.html for derivations
-    // NOTE: this is the distribution of dN(x) ~ x^n*dx, corresponding to N(x) ~ x^(n+1)
+    // NOTE: this is the probability distribution function dN(x) ~ x^n*dx
     for (int i = 0; i < number; i++)
     {
         profile[i] = std::pow((tmp_max - tmp_min)*random(rand_generator) + tmp_min, 1.0/(idx_pow + 1.0));
