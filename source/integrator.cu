@@ -116,11 +116,11 @@ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth)
         real loc_z = (N_Z > 1) ? (static_cast<real>(N_Z)*   (z_1 - Z_MIN) /    (Z_MAX - Z_MIN)) : 0.0;
 
         real optdepth = _get_optdepth(dev_optdepth, loc_x, loc_y, loc_z);
-        real beta_1 = 1.0 - BETA_0*exp(-optdepth) / (s / S_0);
+        real beta_1 = BETA_0*exp(-optdepth) / (s / S_0);
 
         // calculate the forces and torques (using the updated position but outdated velocity)
         real Tx_1 =  0.0;
-        real Fy_1 = -beta_1*G*M_S / y_1 / y_1;
+        real Fy_1 = -(1.0 - beta_1)*G*M_S / y_1 / y_1;
         real Tz_1 =  0.0;
 
         // calculate the centrifugal forces (using the updated position but outdated velocity)
@@ -134,7 +134,7 @@ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth)
 
         // calculate the forces and torques (using the updated position and velocity)
         real Tx_2 =  0.0;
-        real Fy_2 = -beta_1*G*M_S / y_1 / y_1;
+        real Fy_2 = -(1.0 - beta_1)*G*M_S / y_1 / y_1;
         real Tz_2 =  0.0;
 
         // calculate the centrifugal forces (using the updated position and velocity)
