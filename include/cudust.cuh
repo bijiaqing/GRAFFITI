@@ -61,16 +61,13 @@ __device__ real _col_rate_ij (swarm *dev_particle, int idx_old_i, int idx_old_j)
 
 __host__ std::string frame_num (int number, std::size_t length = 5);
 
-__host__ void open_txt_file (std::ofstream &txt_file, std::string  file_name);
-__host__ void save_variable (std::ofstream &txt_file);
+template<typename T>
+bool save_binary (const std::string &file_name, T *data, int number);
 
-__host__ void open_bin_file (std::ofstream &bin_file, std::string  file_name);
-__host__ void save_bin_file (std::ofstream &bin_file, swarm *data, int number);
-__host__ void save_bin_file (std::ofstream &bin_file, float *data, int number);
-__host__ void save_bin_file (std::ofstream &bin_file, real  *data, int number);
+template<typename T>
+bool load_binary (const std::string &file_name, T *data, int number);
 
-__host__ void load_bin_file (std::ifstream &bin_file, std::string  file_name);
-__host__ void read_bin_file (std::ifstream &bin_file, swarm *data, int number);
+__host__ bool save_variable (const std::string &file_name);
 
 // =========================================================================================================================
 // profile generators

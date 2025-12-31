@@ -19,7 +19,6 @@ int main (int argc, char **argv)
     real filesave_timer = 0.0;
     
     std::string fname;
-    std::ofstream ofile;
     std::uniform_real_distribution <real> random(0.0, 1.0); // distribution in [0, 1)
 
     swarm *particle, *dev_particle;
@@ -119,23 +118,19 @@ int main (int argc, char **argv)
 
         mkdir(PATH_FILESAVE.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
-        open_txt_file(ofile, PATH_FILESAVE + "variables.txt");
-        save_variable(ofile);
+        save_variable(PATH_FILESAVE + "variables.txt");
 
         cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
         fname = PATH_FILESAVE + "dustdens_" + frame_num(resume) + ".bin";
-        open_bin_file(ofile, fname);
-        save_bin_file(ofile, dustdens, N_GRD);
+        save_binary(fname, dustdens, N_GRD);
 
         cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
         fname = PATH_FILESAVE + "optdepth_" + frame_num(resume) + ".bin";
-        open_bin_file(ofile, fname);
-        save_bin_file(ofile, optdepth, N_GRD);
+        save_binary(fname, optdepth, N_GRD);
 
         cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
         fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".par";
-        open_bin_file(ofile, fname);
-        save_bin_file(ofile, particle, N_PAR);
+        save_binary(fname, particle, N_PAR);
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         std::cout << std::setw(3) << std::setfill('0') << 0 << "/" << std::setw(3) << std::setfill('0') << FILENUM_MAX << " finished on " << std::ctime(&end_time);
@@ -145,10 +140,8 @@ int main (int argc, char **argv)
         std::stringstream convert{argv[1]};     // set up a stringstream variable named convert, initialized with the input from argv[1]
         if (!(convert >> resume)) resume = -1;  // do the conversion, if conversion fails, set resume to a default value
 
-        std::ifstream ifile;
         fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".bin";
-        load_bin_file(ifile, fname);
-        read_bin_file(ifile, particle, N_PAR);
+        load_binary(fname, particle, N_PAR);
         cudaMemcpy(dev_particle, particle, sizeof(swarm)*N_PAR,  cudaMemcpyHostToDevice);
 
         optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
@@ -220,7 +213,7 @@ int main (int argc, char **argv)
 
         cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
         fname = PATH_FILESAVE + "dustdens_" + frame_num(idx_file) + ".bin";
-        open_bin_file(ofile, fname); save_bin_file(ofile, dustdens, N_GRD);
+        save_binary(fname, dustdens, N_GRD);
 
         // calculate optical depth grids for each output
         optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
@@ -230,13 +223,13 @@ int main (int argc, char **argv)
 
         cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
         fname = PATH_FILESAVE + "optdepth_" + frame_num(idx_file) + ".bin";
-        open_bin_file(ofile, fname); save_bin_file(ofile, optdepth, N_GRD);
+        save_binary(fname, optdepth, N_GRD);
 
         if (idx_file % SWARM_EVERY == 0)
         {
             cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
             fname = PATH_FILESAVE + "particle_" + frame_num(idx_file) + ".par";
-            open_bin_file(ofile, fname); save_bin_file(ofile, particle, N_PAR);
+            save_binary(fname, particle, N_PAR);
         }
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
