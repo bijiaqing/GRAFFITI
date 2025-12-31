@@ -7,9 +7,9 @@
 __global__
 void optdepth_init (real *dev_optdepth)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
     	
-    if (idx >= 0 && idx < NUM_DIM)
+    if (idx < N_GRD)
     {
         dev_optdepth[idx] = 0.0;
     }
@@ -18,9 +18,9 @@ void optdepth_init (real *dev_optdepth)
 __global__
 void dustdens_init (real *dev_dustdens)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
     	
-    if (idx >= 0 && idx < NUM_DIM)
+    if (idx < N_GRD)
     {
         dev_dustdens[idx] = 0.0;
     }
@@ -31,132 +31,95 @@ void dustdens_init (real *dev_dustdens)
 __global__
 void optdepth_enum (real *dev_optdepth, swarm *dev_particle)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx >= 0 && idx < NUM_PAR)
+    if (idx < N_PAR)
     {
-        real par_azi = static_cast<real>(RES_AZI)*   (dev_particle[idx].position.x - AZI_MIN) /    (AZI_MAX - AZI_MIN);
-        real par_rad = static_cast<real>(RES_RAD)*log(dev_particle[idx].position.y / RAD_MIN) / log(RAD_MAX / RAD_MIN);
-        real par_col = static_cast<real>(RES_COL)*   (dev_particle[idx].position.z - COL_MIN) /    (COL_MAX - COL_MIN);
+        real loc_x = (N_X > 1) ? (static_cast<real>(N_X)*   (dev_particle[idx].position.x - X_MIN) /    (X_MAX - X_MIN)) : 0.0;
+        real loc_y = (N_Y > 1) ? (static_cast<real>(N_Y)*log(dev_particle[idx].position.y / Y_MIN) / log(Y_MAX / Y_MIN)) : 0.0;
+        real loc_z = (N_Z > 1) ? (static_cast<real>(N_Z)*   (dev_particle[idx].position.z - Z_MIN) /    (Z_MAX - Z_MIN)) : 0.0;
 
-        bool inside_azi = par_azi >= 0.0 && par_azi < static_cast<real>(RES_AZI);
-        bool inside_rad = par_rad >= 0.0 && par_rad < static_cast<real>(RES_RAD);
-        bool inside_col = par_col >= 0.0 && par_col < static_cast<real>(RES_COL);
+        bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
+        bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
+        bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
 
-        if (inside_azi && inside_rad && inside_col)
+        if (!(in_x && in_y && in_z))
         {
-            interp result = linear_interp_cent(par_azi, par_rad, par_col);
+            return; // particle is out of bounds, do nothing
+        }
 
-            int  next_azi = result.next_azi;
-            int  next_rad = result.next_rad;
-            int  next_col = result.next_col;
-            real frac_azi = result.frac_azi;
-            real frac_rad = result.frac_rad;
-            real frac_col = result.frac_col;
+        interp result = _linear_interp_cent(loc_x, loc_y, loc_z);
 
-            int idx_cell = static_cast<int>(par_col)*NUM_COL + static_cast<int>(par_rad)*RES_AZI + static_cast<int>(par_azi);
+        int  next_x = result.next_x;
+        int  next_y = result.next_y;
+        int  next_z = result.next_z;
+        real frac_x = result.frac_x;
+        real frac_y = result.frac_y;
+        real frac_z = result.frac_z;
 
-            real grain_size = dev_particle[idx].grain_size;
-            real grain_numr = dev_particle[idx].grain_numr;
-            
-            real weight = KAPPA_REF*SIZE_REF*RHO_DUST*grain_numr*grain_size*grain_size;
+        int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
 
-            atomicAdd(&dev_optdepth[idx_cell                                 ], (1.0-frac_azi)*(1.0-frac_rad)*(1.0-frac_col)*weight);
-            atomicAdd(&dev_optdepth[idx_cell + next_azi                      ],      frac_azi *(1.0-frac_rad)*(1.0-frac_col)*weight);
-            atomicAdd(&dev_optdepth[idx_cell            + next_rad           ], (1.0-frac_azi)*     frac_rad *(1.0-frac_col)*weight);
-            atomicAdd(&dev_optdepth[idx_cell + next_azi + next_rad           ],      frac_azi *     frac_rad *(1.0-frac_col)*weight);
-            atomicAdd(&dev_optdepth[idx_cell                       + next_col], (1.0-frac_azi)*(1.0-frac_rad)*     frac_col *weight);
-            atomicAdd(&dev_optdepth[idx_cell + next_azi            + next_col],      frac_azi *(1.0-frac_rad)*     frac_col *weight);
-            atomicAdd(&dev_optdepth[idx_cell            + next_rad + next_col], (1.0-frac_azi)*     frac_rad *     frac_col *weight);
-            atomicAdd(&dev_optdepth[idx_cell + next_azi + next_rad + next_col],      frac_azi *     frac_rad *     frac_col *weight);
-        }   
+        real par_size = dev_particle[idx].par_size;
+        real par_numr = dev_particle[idx].par_numr;
+        
+        real weight = KAPPA_0*S_0*RHO_0*par_numr*par_size*par_size;
+
+        atomicAdd(&dev_optdepth[idx_cell                           ], (1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z)*weight);
+        atomicAdd(&dev_optdepth[idx_cell + next_x                  ],        frac_x *(1.0 - frac_y)*(1.0 - frac_z)*weight);
+        atomicAdd(&dev_optdepth[idx_cell          + next_y         ], (1.0 - frac_x)*       frac_y *(1.0 - frac_z)*weight);
+        atomicAdd(&dev_optdepth[idx_cell + next_x + next_y         ],        frac_x *       frac_y *(1.0 - frac_z)*weight);
+        atomicAdd(&dev_optdepth[idx_cell                   + next_z], (1.0 - frac_x)*(1.0 - frac_y)*       frac_z *weight);
+        atomicAdd(&dev_optdepth[idx_cell + next_x          + next_z],        frac_x *(1.0 - frac_y)*       frac_z *weight);
+        atomicAdd(&dev_optdepth[idx_cell          + next_y + next_z], (1.0 - frac_x)*       frac_y *       frac_z *weight);
+        atomicAdd(&dev_optdepth[idx_cell + next_x + next_y + next_z],        frac_x *       frac_y *       frac_z *weight);
     } 
 }
 
 __global__
 void dustdens_enum (real *dev_dustdens, swarm *dev_particle)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx >= 0 && idx < NUM_PAR)
+    if (idx < N_PAR)
     {
-        real par_azi = static_cast<real>(RES_AZI)*   (dev_particle[idx].position.x - AZI_MIN) /    (AZI_MAX - AZI_MIN);
-        real par_rad = static_cast<real>(RES_RAD)*log(dev_particle[idx].position.y / RAD_MIN) / log(RAD_MAX / RAD_MIN);
-        real par_col = static_cast<real>(RES_COL)*   (dev_particle[idx].position.z - COL_MIN) /    (COL_MAX - COL_MIN);
+        real loc_x = (N_X > 1) ? (static_cast<real>(N_X)*   (dev_particle[idx].position.x - X_MIN) /    (X_MAX - X_MIN)) : 0.0;
+        real loc_y = (N_Y > 1) ? (static_cast<real>(N_Y)*log(dev_particle[idx].position.y / Y_MIN) / log(Y_MAX / Y_MIN)) : 0.0;
+        real loc_z = (N_Z > 1) ? (static_cast<real>(N_Z)*   (dev_particle[idx].position.z - Z_MIN) /    (Z_MAX - Z_MIN)) : 0.0;
 
-        bool inside_azi = par_azi >= 0.0 && par_azi < static_cast<real>(RES_AZI);
-        bool inside_rad = par_rad >= 0.0 && par_rad < static_cast<real>(RES_RAD);
-        bool inside_col = par_col >= 0.0 && par_col < static_cast<real>(RES_COL);
+        bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
+        bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
+        bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
 
-        if (inside_azi && inside_rad && inside_col)
+        if (!(in_x && in_y && in_z))
         {
-            interp result = linear_interp_cent(par_azi, par_rad, par_col);
+            return; // particle is out of bounds, do nothing
+        }
 
-            int  next_azi = result.next_azi;
-            int  next_rad = result.next_rad;
-            int  next_col = result.next_col;
-            real frac_azi = result.frac_azi;
-            real frac_rad = result.frac_rad;
-            real frac_col = result.frac_col;
+        interp result = _linear_interp_cent(loc_x, loc_y, loc_z);
 
-            int idx_cell = static_cast<int>(par_col)*NUM_COL + static_cast<int>(par_rad)*RES_AZI + static_cast<int>(par_azi);
+        int  next_x = result.next_x;
+        int  next_y = result.next_y;
+        int  next_z = result.next_z;
+        real frac_x = result.frac_x;
+        real frac_y = result.frac_y;
+        real frac_z = result.frac_z;
 
-            real grain_size = dev_particle[idx].grain_size;
-            real grain_numr = dev_particle[idx].grain_numr;
+        int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
 
-            real weight = RHO_DUST*grain_numr*grain_size*grain_size*grain_size;
+        real par_size = dev_particle[idx].par_size;
+        real par_numr = dev_particle[idx].par_numr;
 
-            atomicAdd(&dev_dustdens[idx_cell                                 ], (1.0-frac_azi)*(1.0-frac_rad)*(1.0-frac_col)*weight);
-            atomicAdd(&dev_dustdens[idx_cell + next_azi                      ],      frac_azi *(1.0-frac_rad)*(1.0-frac_col)*weight);
-            atomicAdd(&dev_dustdens[idx_cell            + next_rad           ], (1.0-frac_azi)*     frac_rad *(1.0-frac_col)*weight);
-            atomicAdd(&dev_dustdens[idx_cell + next_azi + next_rad           ],      frac_azi *     frac_rad *(1.0-frac_col)*weight);
-            atomicAdd(&dev_dustdens[idx_cell                       + next_col], (1.0-frac_azi)*(1.0-frac_rad)*     frac_col *weight);
-            atomicAdd(&dev_dustdens[idx_cell + next_azi            + next_col],      frac_azi *(1.0-frac_rad)*     frac_col *weight);
-            atomicAdd(&dev_dustdens[idx_cell            + next_rad + next_col], (1.0-frac_azi)*     frac_rad *     frac_col *weight);
-            atomicAdd(&dev_dustdens[idx_cell + next_azi + next_rad + next_col],      frac_azi *     frac_rad *     frac_col *weight);
-        }   
+        real weight = RHO_0*par_numr*par_size*par_size*par_size;
+
+        atomicAdd(&dev_dustdens[idx_cell                           ], (1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z)*weight);
+        atomicAdd(&dev_dustdens[idx_cell + next_x                  ],        frac_x *(1.0 - frac_y)*(1.0 - frac_z)*weight);
+        atomicAdd(&dev_dustdens[idx_cell          + next_y         ], (1.0 - frac_x)*       frac_y *(1.0 - frac_z)*weight);
+        atomicAdd(&dev_dustdens[idx_cell + next_x + next_y         ],        frac_x *       frac_y *(1.0 - frac_z)*weight);
+        atomicAdd(&dev_dustdens[idx_cell                   + next_z], (1.0 - frac_x)*(1.0 - frac_y)*       frac_z *weight);
+        atomicAdd(&dev_dustdens[idx_cell + next_x          + next_z],        frac_x *(1.0 - frac_y)*       frac_z *weight);
+        atomicAdd(&dev_dustdens[idx_cell          + next_y + next_z], (1.0 - frac_x)*       frac_y *       frac_z *weight);
+        atomicAdd(&dev_dustdens[idx_cell + next_x + next_y + next_z],        frac_x *       frac_y *       frac_z *weight);
     } 
-}
-
-// =========================================================================================================================
-
-__device__
-real _get_optdepth (real *dev_optdepth, real par_azi, real par_rad, real par_col)
-{
-    real optdepth = 0.0;
-
-    bool inside_azi = par_azi >= 0.0 && par_azi < static_cast<real>(RES_AZI);
-    bool inside_rad = par_rad >= 0.0 && par_rad < static_cast<real>(RES_RAD);
-    bool inside_col = par_col >= 0.0 && par_col < static_cast<real>(RES_COL);
-
-    if (inside_azi && inside_rad && inside_col)
-    {
-        interp result = linear_interp_stag(par_azi, par_rad, par_col);
-
-        int  next_azi = result.next_azi;
-        int  next_rad = result.next_rad;
-        int  next_col = result.next_col;
-        real frac_azi = result.frac_azi;
-        real frac_rad = result.frac_rad;
-        real frac_col = result.frac_col;
-
-        int idx_cell = static_cast<int>(par_col)*NUM_COL + static_cast<int>(par_rad)*RES_AZI + static_cast<int>(par_azi);
-
-        optdepth += dev_optdepth[idx_cell                                 ]*(1.0-frac_azi)*(1.0-frac_rad)*(1.0-frac_col);
-        optdepth += dev_optdepth[idx_cell + next_azi                      ]*     frac_azi *(1.0-frac_rad)*(1.0-frac_col);
-        optdepth += dev_optdepth[idx_cell            + next_rad           ]*(1.0-frac_azi)*     frac_rad *(1.0-frac_col);
-        optdepth += dev_optdepth[idx_cell + next_azi + next_rad           ]*     frac_azi *     frac_rad *(1.0-frac_col);
-        optdepth += dev_optdepth[idx_cell                       + next_col]*(1.0-frac_azi)*(1.0-frac_rad)*     frac_col ;
-        optdepth += dev_optdepth[idx_cell + next_azi            + next_col]*     frac_azi *(1.0-frac_rad)*     frac_col ;
-        optdepth += dev_optdepth[idx_cell            + next_rad + next_col]*(1.0-frac_azi)*     frac_rad *     frac_col ;
-        optdepth += dev_optdepth[idx_cell + next_azi + next_rad + next_col]*     frac_azi *     frac_rad *     frac_col ;
-    }
-    else if (par_rad >= RES_RAD)
-    {
-        optdepth = DBL_MAX;
-    }
-
-    return optdepth;
 }
 
 // =========================================================================================================================
@@ -164,82 +127,84 @@ real _get_optdepth (real *dev_optdepth, real par_azi, real par_rad, real par_col
 __global__
 void optdepth_calc (real *dev_optdepth)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx >= 0 && idx < NUM_DIM)
+    if (idx < N_GRD)
     {	
-        int idx_azi, idx_rad, idx_col;
+        int idx_x =  idx % N_X;
+        int idx_y = (idx % NG_XY    - idx_x) / N_X;
+        int idx_z = (idx - idx_y*N_X - idx_x) / NG_XY;
 
-        idx_azi =  idx % RES_AZI;
-        idx_rad = (idx % NUM_COL         - idx_azi) / RES_AZI;
-        idx_col = (idx - idx_rad*RES_AZI - idx_azi) / NUM_COL;
+        real dx =    (X_MAX - X_MIN)     / static_cast<real>(N_X);
+        real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
+        real dz =    (Z_MAX - Z_MIN)     / static_cast<real>(N_Z);
 
-        real d_azi, d_rad, d_col, rad_in, col_in, volume;
+        bool has_x = (N_X > 1);
+        bool has_z = (N_Z > 1);
 
-        d_azi =    (AZI_MAX - AZI_MIN)     / static_cast<real>(RES_AZI);
-        d_rad = pow(RAD_MAX / RAD_MIN, 1.0 / static_cast<real>(RES_RAD));
-        d_col =    (COL_MAX - COL_MIN)     / static_cast<real>(RES_COL);
+        real vol_x = has_x ? dx : 1.0;
 
-        rad_in = RAD_MIN*pow(d_rad, static_cast<real>(idx_rad));
-        col_in = COL_MIN+    d_col* static_cast<real>(idx_col);
+        real y_in  = Y_MIN*pow(dy, static_cast<real>(idx_y));
+        real idx_p = static_cast<real>(has_x) + static_cast<real>(has_z) + 1.0;
+        real vol_y = (pow(y_in, idx_p)*(pow(dy, idx_p) - 1.0)) / idx_p;
 
-        volume  = d_azi;
-        volume *= rad_in*rad_in*rad_in*(d_rad*d_rad*d_rad - 1.0) / 3.0;
-        volume *= cos(col_in) - cos(col_in + d_col);
+        real z_in  = Z_MIN + dz*static_cast<real>(idx_z);
+        real vol_z = has_z ? (cos(z_in) - cos(z_in + dz)) : 1.0;
 
-        dev_optdepth[idx] /= volume;
-        dev_optdepth[idx] *= (d_rad - 1.0)*rad_in; // prepare for radial integration
+        dev_optdepth[idx] /= vol_x*vol_y*vol_z;
+        dev_optdepth[idx] *= y_in*(dy - 1.0); // prepare for radial integration
     }
 }
 
 __global__
 void dustdens_calc (real *dev_dustdens)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx >= 0 && idx < NUM_DIM)
+    if (idx < N_GRD)
     {	
-        int idx_azi, idx_rad, idx_col;
+        int idx_x =  idx % N_X;
+        int idx_y = (idx % NG_XY    - idx_x) / N_X;
+        int idx_z = (idx - idx_y*N_X - idx_x) / NG_XY;
 
-        idx_azi =  idx % RES_AZI;
-        idx_rad = (idx % NUM_COL         - idx_azi) / RES_AZI;
-        idx_col = (idx - idx_rad*RES_AZI - idx_azi) / NUM_COL;
+        real dx =    (X_MAX - X_MIN)     / static_cast<real>(N_X);
+        real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
+        real dz =    (Z_MAX - Z_MIN)     / static_cast<real>(N_Z);
 
-        real d_azi, d_rad, d_col, rad_in, col_in, volume;
+        bool has_x = (N_X > 1);
+        bool has_z = (N_Z > 1);
 
-        d_azi =    (AZI_MAX - AZI_MIN)     / static_cast<real>(RES_AZI);
-        d_rad = pow(RAD_MAX / RAD_MIN, 1.0 / static_cast<real>(RES_RAD));
-        d_col =    (COL_MAX - COL_MIN)     / static_cast<real>(RES_COL);
+        real vol_x = has_x ? dx : 1.0;
 
-        rad_in = RAD_MIN*pow(d_rad, static_cast<real>(idx_rad));
-        col_in = COL_MIN+    d_col* static_cast<real>(idx_col);
+        real y_in  = Y_MIN*pow(dy, static_cast<real>(idx_y));
+        real idx_p = static_cast<real>(has_x) + static_cast<real>(has_z) + 1.0;
+        real vol_y = pow(y_in, idx_p)*(pow(dy, idx_p) - 1.0) / idx_p;
 
-        volume  = d_azi;
-        volume *= rad_in*rad_in*rad_in*(d_rad*d_rad*d_rad - 1.0) / 3.0;
-        volume *= cos(col_in) - cos(col_in + d_col);
+        real z_in  = Z_MIN + dz*static_cast<real>(idx_z);
+        real vol_z = has_z ? (cos(z_in) - cos(z_in + dz)) : 1.0;
 
-        dev_dustdens[idx] /= volume;
+        dev_dustdens[idx] /= vol_x*vol_y*vol_z;
     }
 }
 
 // =========================================================================================================================
 
 __global__
-void optdepth_inte (real *dev_optdepth)
+void optdepth_intg (real *dev_optdepth)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx >= 0 && idx < NUM_RAD)
+    if (idx < NG_XZ)
     {	
-        int idx_azi, idx_col, idx_cell;
+        int idx_x, idx_z, idx_cell;
 
-        idx_azi = idx % RES_AZI;
-        idx_col = (idx - idx_azi) / RES_AZI;
+        idx_x = idx % N_X;
+        idx_z = (idx - idx_x) / N_X;
 
-        for (int i = 1; i < RES_RAD; i++)
+        for (int i = 1; i < N_Y; i++)
         {
-            idx_cell = idx_col*NUM_COL + i*RES_AZI + idx_azi;
-            dev_optdepth[idx_cell] += dev_optdepth[idx_cell - RES_AZI];
+            idx_cell = idx_z*NG_XY + i*N_X + idx_x;
+            dev_optdepth[idx_cell] += dev_optdepth[idx_cell - N_X];
         }
     }
 }
@@ -247,27 +212,27 @@ void optdepth_inte (real *dev_optdepth)
 __global__
 void optdepth_mean (real *dev_optdepth)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx >= 0 && idx < NUM_AZI)
+    if (idx < NG_YZ)
     {	
-        int idx_rad, idx_col, idx_cell;
+        int idx_y, idx_z, idx_cell;
 
         real optdepth_sum = 0.0;
 
-        idx_rad = idx % RES_RAD;
-        idx_col = (idx - idx_rad) / RES_RAD;
+        idx_y = idx % N_Y;
+        idx_z = (idx - idx_y) / N_Y;
 
-        for (int i = 0; i < RES_AZI; i++)
+        for (int i = 0; i < N_X; i++)
         {
-            idx_cell = idx_col*NUM_COL + idx_rad*RES_AZI + i;
+            idx_cell = idx_z*NG_XY + idx_y*N_X + i;
             optdepth_sum += dev_optdepth[idx_cell];
         }
 
-        for (int j = 0; j < RES_AZI; j++)
+        for (int j = 0; j < N_X; j++)
         {
-            idx_cell = idx_col*NUM_COL + idx_rad*RES_AZI + j;
-            dev_optdepth[idx_cell] = optdepth_sum / RES_AZI;
+            idx_cell = idx_z*NG_XY + idx_y*N_X + j;
+            dev_optdepth[idx_cell] = optdepth_sum / N_X;
         }
     }
 }

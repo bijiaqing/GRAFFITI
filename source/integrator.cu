@@ -3,142 +3,247 @@
 // =========================================================================================================================
 
 __global__ 
-void ssa_substep_1 (swarm *dev_particle, real *dev_timestep)
+void ssa_substep_1 (swarm *dev_particle)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if(idx >= 0 && idx < NUM_PAR)
+    if (idx < N_PAR)
     {
-        real azi_i, l_azi_i, azi_1;
-        real rad_i, v_rad_i, rad_1;
-        real col_i, l_col_i, col_1;
+        real dt = DT_DYNAMICS;
 
-        real dt = *dev_timestep;
+        real x_i  = dev_particle[idx].position.x;
+        real y_i  = dev_particle[idx].position.y;
+        real z_i  = dev_particle[idx].position.z;
+        
+        real lx_i = dev_particle[idx].velocity.x;
+        real vy_i = dev_particle[idx].velocity.y;
+        real lz_i = dev_particle[idx].velocity.z;
 
-        azi_i   = dev_particle[idx].position.x;
-        rad_i   = dev_particle[idx].position.y;
-        col_i   = dev_particle[idx].position.z;
-        l_azi_i = dev_particle[idx].velocity.x;
-        v_rad_i = dev_particle[idx].velocity.y;
-        l_col_i = dev_particle[idx].velocity.z;
+        real y_1 = y_i + 0.5*vy_i*dt;
+        real z_1 = z_i + 0.5*lz_i*dt / y_i / y_1;
+        real x_1 = x_i + 0.5*lx_i*dt / y_i / y_1 / sin(z_i) / sin(z_1);
 
-        rad_1 = rad_i + 0.5*v_rad_i*dt;
-        col_1 = col_i + 0.5*l_col_i*dt / rad_i / rad_1;
-        azi_1 = azi_i + 0.5*l_azi_i*dt / rad_i / rad_1 / sin(col_i) / sin(col_1);
-
-        while (azi_1 >= AZI_MAX) azi_1 -= 2.0*M_PI;
-        while (azi_1 <  AZI_MIN) azi_1 += 2.0*M_PI;
-
-        if (rad_1 < RAD_MIN) 
+        if (N_X == 1) 
         {
-            rad_1 = RAD_MAX;
-            dev_particle[idx].velocity.x = sqrt(G*M_STAR*RAD_MAX);
+            x_1 = 0.5*(X_MIN + X_MAX);
+        }
+        else
+        {
+            // keep x within [X_MIN, X_MAX)
+            while (x_1 >= X_MAX) x_1 -= X_MAX - X_MIN;
+            while (x_1 <  X_MIN) x_1 += X_MAX - X_MIN;
+        }
+
+        if (y_1 < Y_MIN)    
+        {
+            // throw it to the end of the radial domain
+            y_1 = Y_MAX;
+            z_1 = 0.5*M_PI;
+            dev_particle[idx].velocity.x = sqrt(G*M_S*Y_MAX);
             dev_particle[idx].velocity.y = 0.0;
             dev_particle[idx].velocity.z = 0.0;
         }
 
-        dev_particle[idx].position.x = azi_1;
-        dev_particle[idx].position.y = rad_1;
-        dev_particle[idx].position.z = col_1;
+        if (N_Z == 1)
+        {
+            z_1 = 0.5*M_PI;
+        }
+        else if (z_1 < Z_MIN || z_1 >= Z_MAX)
+        {
+            // z_1 = ( z_1 < Z_MIN ) ? (2.0*Z_MIN - z_1) : (2.0*Z_MAX - z_1); // reflect at the boundary
+            // z_1 = 0.5*M_PI; // throw it to the mid-plane
+            
+            // throw it to the end of the radial domain
+            y_1 = Y_MAX;
+            z_1 = 0.5*M_PI;
+            dev_particle[idx].velocity.x = sqrt(G*M_S*Y_MAX);
+            dev_particle[idx].velocity.y = 0.0;
+            dev_particle[idx].velocity.z = 0.0;
+        }
+
+        dev_particle[idx].position.x = x_1;
+        dev_particle[idx].position.y = y_1;
+        dev_particle[idx].position.z = z_1;
     }
 }
 
 // =========================================================================================================================
 
 __global__
-void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth, real *dev_timestep)
+void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth)
 {
-    int idx = threadIdx.x + blockDim.x*blockIdx.x;
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if(idx >= 0 && idx < NUM_PAR)
+    if (idx < N_PAR)
     {
-        real l_azi_i, azi_1, l_azi_1, lg_azi_1, torq_azi_1, torq_azi_2, azi_j, l_azi_j, par_azi;
-        real v_rad_i, rad_1,          vg_rad_1,             forc_rad_2, rad_j, v_rad_j, par_rad;
-        real l_col_i, col_1, l_col_1, lg_col_1, torq_col_1, torq_col_2, col_j, l_col_j, par_col;
-        real size, optdepth, ts_1, tau_1, eta_1, beta_1;
+        real dt = DT_DYNAMICS;
 
-        azi_1   = dev_particle[idx].position.x;
-        rad_1   = dev_particle[idx].position.y;
-        col_1   = dev_particle[idx].position.z;
-        l_azi_i = dev_particle[idx].velocity.x;
-        v_rad_i = dev_particle[idx].velocity.y;
-        l_col_i = dev_particle[idx].velocity.z;
-        size    = dev_particle[idx].grain_size;
+        real x_1  = dev_particle[idx].position.x;
+        real y_1  = dev_particle[idx].position.y;
+        real z_1  = dev_particle[idx].position.z;
+        
+        real lx_i = dev_particle[idx].velocity.x;
+        real vy_i = dev_particle[idx].velocity.y;
+        real lz_i = dev_particle[idx].velocity.z;
+        
+        real s    = dev_particle[idx].par_size;
 
-        real dt = *dev_timestep;
+        real bigR_1 = y_1*sin(z_1);
+        real bigZ_1 = y_1*cos(z_1);
 
-        real bigR_1 = rad_1*sin(col_1);
-        real bigZ_1 = rad_1*cos(col_1);
+        real h_sqr = h_0*h_0*pow(bigR_1, IDX_TEMP + 1.0);
 
         // get the velocity of gas in the hydrostatic equilibrium state
-        eta_1 = (IDX_SIGMAG + IDX_TEMP - 1.0)*H_REF*H_REF*pow(bigR_1 / RAD_REF, IDX_TEMP + 1.0) + IDX_TEMP*(1.0 - bigR_1 / rad_1); 
-        lg_azi_1 = sqrt(G*M_STAR*bigR_1)*sqrt(1.0 + eta_1);
-        vg_rad_1 = 0.0;
-        lg_col_1 = 0.0;
+        real eta_1; // eta_1 is normally a negative value
+        eta_1  = (IDX_SURF + 0.5*IDX_TEMP - 1.5)*h_sqr; // (p + q)h^2
+        eta_1 += IDX_TEMP*(1.0 - bigR_1 / y_1);
+        
+        real lxg_1 = sqrt(G*M_S*bigR_1)*sqrt(1.0 + eta_1);
+        real vyg_1 = 0.0;
+        real lzg_1 = 0.0;
 
         // calculate the stopping time and the dimensionless time
-        ts_1  = ST_REF*(size / SIZE_REF) / sqrt(G*M_STAR / RAD_REF / RAD_REF / RAD_REF);
-        ts_1 *= pow(bigR_1 / RAD_REF, - 0.5*IDX_TEMP - IDX_SIGMAG + 1.0); // correct for radial gas density and sound speed
-        ts_1 *= exp(bigZ_1*bigZ_1 / (2.0*H_REF*H_REF*bigR_1*bigR_1*pow(bigR_1 / RAD_REF, IDX_TEMP + 1.0))); // correct for vertical gas density
-        tau_1 = dt / ts_1;
+        real ts_1;
+        ts_1  = ST_0*(s / S_0) / sqrt(G*M_S / R_0 / R_0 / R_0); // for reference size grain at the reference radius
+        ts_1 *= pow(bigR_1, -IDX_SURF + 1.5);                   // correct for radial gas density and sound speed
+        ts_1 *= exp(-bigZ_1*bigZ_1 / (2.0*h_sqr*bigR_1*bigR_1));   // correct for vertical gas density
+        
+        real tau_1 = dt / ts_1;
 
         // retrieve the optical depth of the particle based on its position and calculate beta
-        par_azi  = static_cast<real>(RES_AZI)*   (azi_1 - AZI_MIN) /    (AZI_MAX - AZI_MIN);
-        par_rad  = static_cast<real>(RES_RAD)*log(rad_1 / RAD_MIN) / log(RAD_MAX / RAD_MIN);
-        par_col  = static_cast<real>(RES_COL)*   (col_1 - COL_MIN) /    (COL_MAX - COL_MIN);
-        optdepth = _get_optdepth(dev_optdepth, par_azi, par_rad, par_col);
-        beta_1   = 1.0 - BETA_REF*exp(-optdepth) / (size / SIZE_REF);
+        real loc_x = (N_X > 1) ? (static_cast<real>(N_X)*   (x_1 - X_MIN) /    (X_MAX - X_MIN)) : 0.0;
+        real loc_y = (N_Y > 1) ? (static_cast<real>(N_Y)*log(y_1 / Y_MIN) / log(Y_MAX / Y_MIN)) : 0.0;
+        real loc_z = (N_Z > 1) ? (static_cast<real>(N_Z)*   (z_1 - Z_MIN) /    (Z_MAX - Z_MIN)) : 0.0;
+
+        real optdepth = _get_optdepth(dev_optdepth, loc_x, loc_y, loc_z);
+        real beta_1 = 1.0 - BETA_0*exp(-optdepth) / (s / S_0);
 
         // calculate the forces and torques (using the updated position but outdated velocity)
-        torq_azi_1 =  0.0;
-        // forc_rad_1 = -beta_1*G*M_STAR / rad_1 / rad_1;
-        torq_col_1 =  0.0;
+        real Tx_1 =  0.0;
+        real Fy_1 = -beta_1*G*M_S / y_1 / y_1;
+        real Tz_1 =  0.0;
 
         // calculate the centrifugal forces (using the updated position but outdated velocity)
-        // real ctfg_rad_1 = l_azi_i*l_azi_i / bigR_1 / bigR_1 / rad_1 + l_col_i*l_col_i / rad_1 / rad_1 / rad_1;
-        real ctfg_col_1 = l_azi_i*l_azi_i / bigR_1 / bigR_1 / sin(col_1) * cos(col_1);
+        real Fcy_1 = lx_i*lx_i / bigR_1 / bigR_1 / y_1 + lz_i*lz_i / y_1 / y_1 / y_1;
+        real Tcz_1 = lx_i*lx_i / bigR_1 / bigR_1 / sin(z_1) * cos(z_1);
 
         // calculate the updated velocities
-        l_azi_1 = l_azi_i + ((torq_azi_1             )*ts_1 + lg_azi_1 - l_azi_i)*(1.0 - exp(-0.5*tau_1));
-        // v_rad_1 = v_rad_i + ((forc_rad_1 + ctfg_rad_1)*ts_1 + vg_rad_1 - v_rad_i)*(1.0 - exp(-0.5*tau_1));
-        l_col_1 = l_col_i + ((torq_col_1 + ctfg_col_1)*ts_1 + lg_col_1 - l_col_i)*(1.0 - exp(-0.5*tau_1));
+        real lx_1 = lx_i + ((Tx_1        )*ts_1 + lxg_1 - lx_i)*(1.0 - exp(-0.5*tau_1));
+        real vy_1 = vy_i + ((Fy_1 + Fcy_1)*ts_1 + vyg_1 - vy_i)*(1.0 - exp(-0.5*tau_1));
+        real lz_1 = lz_i + ((Tz_1 + Tcz_1)*ts_1 + lzg_1 - lz_i)*(1.0 - exp(-0.5*tau_1));
 
         // calculate the forces and torques (using the updated position and velocity)
-        torq_azi_2 =  0.0;
-        forc_rad_2 = -beta_1*G*M_STAR / rad_1 / rad_1;
-        torq_col_2 =  0.0;
+        real Tx_2 =  0.0;
+        real Fy_2 = -beta_1*G*M_S / y_1 / y_1;
+        real Tz_2 =  0.0;
 
         // calculate the centrifugal forces (using the updated position and velocity)
-        real ctfg_rad_2 = l_azi_1*l_azi_1 / bigR_1 / bigR_1 / rad_1 + l_col_1*l_col_1 / rad_1 / rad_1 / rad_1;
-        real ctfg_col_2 = l_azi_1*l_azi_1 / bigR_1 / bigR_1 / sin(col_1) * cos(col_1);
+        real Fcy_2 = lx_1*lx_1 / bigR_1 / bigR_1 / y_1 + lz_1*lz_1 / y_1 / y_1 / y_1;
+        real Tcz_2 = lx_1*lx_1 / bigR_1 / bigR_1 / sin(z_1) * cos(z_1);
 
         // calculate the next-step velocity
-        l_azi_j = l_azi_i + ((torq_azi_2             )*ts_1 + lg_azi_1 - l_azi_i)*(1.0 - exp(-tau_1));
-        v_rad_j = v_rad_i + ((forc_rad_2 + ctfg_rad_2)*ts_1 + vg_rad_1 - v_rad_i)*(1.0 - exp(-tau_1));
-        l_col_j = l_col_i + ((torq_col_2 + ctfg_col_2)*ts_1 + lg_col_1 - l_col_i)*(1.0 - exp(-tau_1));
+        real lx_j = lx_i + ((Tx_2        )*ts_1 + lxg_1 - lx_i)*(1.0 - exp(-tau_1));
+        real vy_j = vy_i + ((Fy_2 + Fcy_2)*ts_1 + vyg_1 - vy_i)*(1.0 - exp(-tau_1));
+        real lz_j = lz_i + ((Tz_2 + Tcz_2)*ts_1 + lzg_1 - lz_i)*(1.0 - exp(-tau_1));
 
         // calculate the next-step position (the sequence matters!!)
-        rad_j = rad_1 + 0.5*v_rad_j*dt;
-        col_j = col_1 + 0.5*l_col_j*dt / rad_1 / rad_j;
-        azi_j = azi_1 + 0.5*l_azi_j*dt / rad_1 / rad_j / sin(col_1) / sin(col_j);
+        real y_j = y_1 + 0.5*vy_j*dt;
+        real z_j = z_1 + 0.5*lz_j*dt / y_1 / y_j;
+        real x_j = x_1 + 0.5*lx_j*dt / y_1 / y_j / sin(z_1) / sin(z_j);
 
-        while (azi_j >= AZI_MAX) azi_j -= 2.0*M_PI;
-        while (azi_j <  AZI_MIN) azi_j += 2.0*M_PI;
-
-        if (rad_j < RAD_MIN) 
+        if (N_X == 1) 
         {
-            rad_j   = RAD_MAX;
-            l_azi_j = sqrt(G*M_STAR*RAD_MAX);
-            v_rad_j = 0.0;
-            l_col_j = 0.0;
+            x_j = 0.5*(X_MIN + X_MAX);
+        }
+        else
+        {
+            // keep x within [X_MIN, X_MAX)
+            while (x_j >= X_MAX) x_j -= X_MAX - X_MIN;
+            while (x_j <  X_MIN) x_j += X_MAX - X_MIN;
         }
 
-        dev_particle[idx].position.x = azi_j;
-        dev_particle[idx].position.y = rad_j;
-        dev_particle[idx].position.z = col_j;
+        if (y_j < Y_MIN)    // throw it to the end of the radial domain
+        {
+            y_j  = Y_MAX;
+            z_j  = 0.5*M_PI;
+            lx_j = sqrt(G*M_S*Y_MAX);
+            vy_j = 0.0;
+            lz_j = 0.0;
+        }
 
-        dev_particle[idx].velocity.x = l_azi_j;
-        dev_particle[idx].velocity.y = v_rad_j;
-        dev_particle[idx].velocity.z = l_col_j;
+        if (N_Z == 1)
+        {
+            z_j = 0.5*M_PI;
+        }
+        else if (z_j < Z_MIN || z_j >= Z_MAX)
+        {
+            // z_j = ( z_j < Z_MIN ) ? (2.0*Z_MIN - z_j) : (2.0*Z_MAX - z_j); // reflect at the boundary
+            // z_j = 0.5*M_PI; // throw it to the mid-plane
+            
+            // throw it to the end of the radial domain
+            y_j  = Y_MAX;
+            z_j  = 0.5*M_PI;
+            lx_j = sqrt(G*M_S*Y_MAX);
+            vy_j = 0.0;
+            lz_j = 0.0;
+        }
+
+        dev_particle[idx].position.x = x_j;
+        dev_particle[idx].position.y = y_j;
+        dev_particle[idx].position.z = z_j;
+        
+        dev_particle[idx].velocity.x = lx_j;
+        dev_particle[idx].velocity.y = vy_j;
+        dev_particle[idx].velocity.z = lz_j;
+    }
+}
+
+// =========================================================================================================================
+
+__global__
+void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par)
+{
+    int idx = threadIdx.x+blockDim.x*blockIdx.x;
+
+    if (idx < N_PAR)
+    {
+        real dt = DT_DYNAMICS;
+        
+        real y = dev_particle[idx].position.y;
+        real z = dev_particle[idx].position.z;
+
+        real bigR = y*sin(z);
+        real bigZ = y*cos(z);
+
+        real h_sqr = h_0*h_0*pow(bigR, IDX_TEMP + 1.0);
+
+        real D_diff = ALPHA*h_sqr*sqrt(G*M_S*bigR);
+        
+        // ( d(rhog)/dR ) / rhog = p / R = (IDX_SURF - 0.5*IDX_TEMP - 1.5) / R
+        // ( d(diff)/dR ) = (2f + 0.5)*diff / R = (IDX_TEMP + 1.5)*diff / R
+        real delta_avg_y = (IDX_SURF + 0.5*IDX_TEMP)*dt*D_diff / bigR;
+        real sigma_sqr_y = 2.0*D_diff*dt + (IDX_TEMP + 1.5)*(IDX_TEMP + 1.5)*D_diff*D_diff*dt*dt / bigR / bigR;
+        
+        // ( d(rhog)/dZ ) / rhog = -z / H_g^2
+        // ( d(diff)/dZ ) = 0
+        real delta_avg_z = -bigZ*dt*D_diff / (h_sqr*bigR*bigR);
+        real sigma_sqr_z = 2.0*D_diff*dt;
+        
+        curandState rngs_par = dev_rngs_par[idx];   // use a local state for less global memory traffic 
+
+        real delta_R = delta_avg_y + sqrt(sigma_sqr_y)*curand_normal_double(&rngs_par);    // in polar R
+        real delta_Z = delta_avg_z + sqrt(sigma_sqr_z)*curand_normal_double(&rngs_par);    // in polar Z
+
+        dev_rngs_par[idx] = rngs_par;               // update the global state, otherwise, always the same number
+
+        if (N_Z == 1)
+        {
+            dev_particle[idx].position.y = bigR + delta_R;
+        }
+        else
+        {
+            dev_particle[idx].position.y = sqrt((bigR + delta_R)*(bigR + delta_R) + (bigZ + delta_Z)*(bigZ + delta_Z));
+            dev_particle[idx].position.z = atan2(bigR + delta_R, bigZ + delta_Z);
+        }
     }
 }

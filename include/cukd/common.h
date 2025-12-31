@@ -289,7 +289,7 @@ namespace cukd {
 #define CUKD_CUDA_CHECK2( where, call )                                 \
   {                                                                     \
     cudaError_t rc = call;                                              \
-    if(rc != cudaSuccess) {                                             \
+    if (rc != cudaSuccess) {                                             \
       if (where)                                                        \
         fprintf(stderr, "at %s: CUDA call (%s) "                        \
                 "failed with code %d (line %d): %s\n",                  \
@@ -330,7 +330,7 @@ namespace cukd {
 #define CUKD_CUDA_CHECK2_NOTHROW( where, call )                         \
   {                                                                     \
     cudaError_t rc = call;                                              \
-    if(rc != cudaSuccess) {                                             \
+    if (rc != cudaSuccess) {                                             \
       if (where)                                                        \
         fprintf(stderr, "at %s: CUDA call (%s) "                        \
                 "failed with code %d (line %d): %s\n",                  \

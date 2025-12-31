@@ -6,7 +6,7 @@
 // =========================================================================================================================
 
 __host__
-std::string frame_num (int number, std::size_t length)
+std::string frame_num (int number, std::size_t length)  // the length is set to 5 by default in cudust.cuh
 {
     std::string str = std::to_string(number);
 
@@ -73,7 +73,7 @@ void save_variable (std::ofstream &txt_file)
 {
     txt_file << "[PARAMETERS]"                                                                                              << std::endl;
 
-    // txt_file << "NUM_PAR = \t" << scientific << std::setprecision(15) << std::setw(24) << std::setfill(' ') << NUM_PAR            << endl;
+    // txt_file << "N_PAR = \t" << scientific << std::setprecision(15) << std::setw(24) << std::setfill(' ') << N_PAR            << std::endl;
 
     txt_file.close();
 }

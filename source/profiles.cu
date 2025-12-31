@@ -38,7 +38,7 @@ void rand_gaussian (real *profile, int number, real p_min, real p_max, real p_0,
 // =========================================================================================================================
 
 __host__
-void rand_powerlaw (real *profile, int number, real p_min, real p_max, real idx_pow)
+void rand_pow_law (real *profile, int number, real p_min, real p_max, real idx_pow)
 {
     real tmp_min, tmp_max;
     std::uniform_real_distribution <real> random(0.0, 1.0);
@@ -57,31 +57,40 @@ void rand_powerlaw (real *profile, int number, real p_min, real p_max, real idx_
 // =========================================================================================================================
 
 __host__
-real pow_law (real x, real x_min, real x_max, real idx_pow)
-{
-    real output;
-
-    if (x >= x_min && x <= x_max)
-        output = std::pow(x/x_min, idx_pow); 
-    else
-        output = 0.0;
-
-    return output;
-}
-
-__host__
-real gauss_kernel (real x, real x_0, real sigma)
+real gaussian (real x, real x_0, real sigma)
 {
     return std::exp(-(x - x_0)*(x - x_0)/(2.0*sigma*sigma));
 }
 
 __host__
-void rand_conv_pow (real *profile, int number, real p_min, real p_max, real idx_pow, real smooth, int bins)
+real tapered_pow (real x, real x_min, real x_max, real idx_pow)
 {
+    real output;
+
+    if (x >= x_min && x <= x_max)
+    {
+        output = std::pow(x / x_min, idx_pow);
+    }
+    else
+    {
+        output = 0.0;
+    }
+
+    return output;
+}
+
+__host__
+void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_pow, real smooth, int bins)
+{
+    // a convolved (i.e., smoothed) power-law profile
+    
     int n = 0;
 
-    real x_min = p_min - 2.0*smooth;
-    real x_max = p_max + 2.0*smooth;
+    // x_min and x_max define the hard boundary of the smoothed profile
+    // p_min and p_max define the domain that is not too much smoothed
+    real p_min = x_min + smooth;
+    real p_max = x_max - smooth;
+    
     real par_x = 0.0;
     real dec_x = 0.0;
     real y_max = 0.0;
@@ -101,7 +110,7 @@ void rand_conv_pow (real *profile, int number, real p_min, real p_max, real idx_
     {
         for (int k = 0; k < bins; k++)
         {
-            y_axis[k] += pow_law(x_axis[j], p_min, p_max, idx_pow)*gauss_kernel(x_axis[k], x_axis[j], smooth);
+            y_axis[k] += tapered_pow(x_axis[j], p_min, p_max, idx_pow)*gaussian(x_axis[k], x_axis[j], 0.5*smooth);
         }
     }
 

@@ -3,121 +3,130 @@
 // =========================================================================================================================
 
 __device__ 
-interp linear_interp_cent (real par_azi, real par_rad, real par_col)
+interp _linear_interp_cent (real loc_x, real loc_y, real loc_z)
 {
-    real deci_azi, deci_rad, deci_col;
-    real cent_azi, cent_rad, cent_col;
-    real frac_azi, frac_rad, frac_col;
-    int  next_azi, next_rad, next_col;
+    // loc_x, loc_y, loc_z are the precise particle locations in the cell-index coordinates
 
-    real d_rad = pow(RAD_MAX / RAD_MIN, 1.0 / static_cast<real>(RES_RAD));
+    bool edge_x, edge_y, edge_z;    // whether the particle is too close to the domain boundaries
+    real frac_x, frac_y, frac_z;    // the fraction of a particle NOT shared by the cell after interpolation
+    real deci_x, deci_y, deci_z;    // the decimal value of particle locations in the cell-index coordinates
+    real cent_x, cent_y, cent_z;    // the location of the center of the cell  in the cell-index coordinates
+    int  next_x, next_y, next_z;    // the distance to the neighboring cell    in the cell-index coordinates
 
-    deci_azi = par_azi - floor(par_azi);
-    deci_rad = par_rad - floor(par_rad);
-    deci_col = par_col - floor(par_col);
+    deci_x = loc_x - floor(loc_x);
+    deci_y = loc_y - floor(loc_y);
+    deci_z = loc_z - floor(loc_z);
 
-    cent_azi = 0.5;
-    cent_rad = log(0.5*(1.0 + d_rad)) / log(d_rad); // deci_rad for the midpoint of the cell
-    cent_col = 0.5;
+    real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y)); // exponential base for logarithmic spacing
 
-    // "cent_rad = log(0.5*(1.0 + d_rad)) / log(d_rad)" is slightly larger than 0.5
-    // it means that values are defined at the (radial) geometric center of each cell
-    // therefore, linear interpolation at radial edges of cells will always bias to the inner one
-    // if "cent_rad = 0.5", then particles exactly at the radial edges will be equally split into the two cells
+    cent_x = 0.5;
+    cent_y = log(0.5*(1.0 + dy)) / log(dy); // dy^cent_y is the geometric center of the cell
+    cent_z = 0.5;
 
-    bool inside_azi = par_azi >= cent_azi && par_azi < RES_AZI + cent_azi - 1.0;
-    bool inside_rad = par_rad >= cent_rad && par_rad < RES_RAD + cent_rad - 1.0;
-    bool inside_col = par_col >= cent_col && par_col < RES_COL + cent_col - 1.0;
-
-    if (inside_azi)
+    if (N_X == 1)                   // if there is only one cell in X
     {
-        if (deci_azi >= cent_azi)
-        {
-            frac_azi = deci_azi - cent_azi;
-            next_azi = 1;
-        }
-        else
-        {
-            frac_azi = cent_azi - deci_azi;
-            next_azi = -1;
-        }
+        frac_x = 0;                 // the share for the current cell is '1.0 - frac_x'
+        next_x = 0;                 // no other cells to share the particle
     }
     else
     {
-        if (deci_azi >= cent_azi)
+        edge_x = loc_x < cent_x || loc_x > N_X - cent_x;
+
+        if (not edge_x)             // still in the interior of the X domain
         {
-            frac_azi = deci_azi - cent_azi;
-            next_azi = 1 - RES_AZI;
+            if (deci_x >= cent_x)   // share with the cell on the right
+            {
+                frac_x = deci_x - cent_x;
+                next_x = 1;
+            }
+            else                    // share with the cell on the left
+            {
+                frac_x = cent_x - deci_x;
+                next_x = -1;
+            }
         }
-        else
+        else                        // too close to the inner or the outer X boundary 
         {
-            frac_azi = cent_azi - deci_azi;
-            next_azi = RES_AZI - 1;
+            if (deci_x >= cent_x)   // too close to the outer X boundary
+            {
+                frac_x = deci_x - cent_x;
+                next_x = 1 - N_X;   // share with the first cell of its row
+            }
+            else                    // too close to the inner X boundary
+            {
+                frac_x = cent_x - deci_x;
+                next_x = N_X - 1;   // share with the last  cell of its row
+            }
         }
     }
 
-    if (inside_rad)
+    if (N_Y == 1)                   // if there is only one cell in Y
     {
-        if (deci_rad >= cent_rad)
-        {
-            frac_rad = (pow(d_rad, 3.0*(deci_rad - cent_rad)) - 1.0) / (pow(d_rad, 3.0) - 1.0);
-            next_rad = RES_AZI;
-        }
-        else
-        {
-            frac_rad = (pow(d_rad, 3.0) - pow(d_rad, 3.0*(deci_rad - cent_rad + 1.0))) / (pow(d_rad, 3.0) - 1.0);
-            next_rad = -RES_AZI;
-        }
+        frac_y = 0;                 // the share for the current cell is '1.0 - frac_y'
+        next_y = 0;                 // no other cells to share the particle
     }
     else
     {
-        if (deci_rad >= cent_rad)
+        edge_y = loc_y < cent_y || loc_y > N_Y - cent_y;
+
+        if (not edge_y)             // still in the interior of the Y domain
         {
-            frac_rad = (pow(d_rad, 3.0*(deci_rad - cent_rad)) - 1.0) / (pow(d_rad, 3.0) - 1.0);
-            next_rad = 0;
+            if (deci_y >= cent_y)   // share with the cell on the right
+            {
+                frac_y = (pow(dy, deci_y - cent_y) - 1.0) / (dy - 1.0);
+                next_y = N_X;       // the index distance to the next Y cell on the right is N_X
+            }
+            else                    // share with the cell on the left
+            {
+                frac_y = (pow(dy, deci_y - cent_y) - 1.0) / (1.0 / dy - 1.0);
+                next_y = - N_X;
+            }
         }
-        else
+        else                        // at the Y domain boundaries, the current cell take it all like N_Y = 1
         {
-            frac_rad = (pow(d_rad, 3.0) - pow(d_rad, 3.0*(deci_rad - cent_rad + 1.0))) / (pow(d_rad, 3.0) - 1.0);
-            next_rad = 0;
+            frac_y = 0;
+            next_y = 0;
         }
     }
 
-    if (inside_col)
+
+    if (N_Z == 1)                   // if there is only one cell in Z
     {
-        if (deci_col >= cent_col)
-        {
-            frac_col = deci_col - cent_col;
-            next_col = NUM_COL;
-        }
-        else
-        {
-            frac_col = cent_col - deci_col;
-            next_col = -NUM_COL;
-        }
+        frac_z = 0;                 // the share for the current cell is '1.0 - frac_z'
+        next_z = 0;                 // no other cells to share the particle
     }
     else
     {
-        if (deci_col >= cent_col)
+        edge_z = loc_z < cent_z || loc_z > N_Z - cent_z;
+        
+        if (not edge_z)             // still in the interior of the Z domain
         {
-            frac_col = deci_col - cent_col;
-            next_col = 0;
+            if (deci_z >= cent_z)
+            {
+                frac_z = deci_z - cent_z;
+                next_z = NG_XY;    // the index distance to the next Z cell on the right is N_X*N_Y = NG_XY
+            }
+            else
+            {
+                frac_z = cent_z - deci_z;
+                next_z = - NG_XY;
+            }
         }
-        else
+        else                        // at the Z domain boundaries, the current cell take it all like N_Z = 1
         {
-            frac_col = cent_col - deci_col;
-            next_col = 0;
+            frac_z = 0;
+            next_z = 0;
         }
     }
 
     interp result;
 
-    result.next_azi = next_azi;
-    result.next_rad = next_rad;
-    result.next_col = next_col;
-    result.frac_azi = frac_azi;
-    result.frac_rad = frac_rad;
-    result.frac_col = frac_col;
+    result.next_x = next_x;
+    result.next_y = next_y;
+    result.next_z = next_z;
+    result.frac_x = frac_x;
+    result.frac_y = frac_y;
+    result.frac_z = frac_z;
 
     return result;
 }
@@ -125,103 +134,168 @@ interp linear_interp_cent (real par_azi, real par_rad, real par_col)
 // =========================================================================================================================
 
 __device__ 
-interp linear_interp_stag (real par_azi, real par_rad, real par_col)
+interp _linear_interp_edge (real loc_x, real loc_y, real loc_z)
 {
-    real deci_azi, deci_rad, deci_col;
-    real cent_azi, cent_rad, cent_col;
-    real frac_azi, frac_rad, frac_col;
-    int  next_azi, next_rad, next_col;
+    // this function exists because the optical depth field is defined at the outer radial boundary of each cell
+    // the particle needs to be interpolated based on the location of the radial cell edges to get the shadow
+    // the only difference between '_linear_interp_edge' and '_linear_interp_cent' is the interpolation rule in Y
 
-    real d_rad = pow(RAD_MAX / RAD_MIN, 1.0 / static_cast<real>(RES_RAD));
+    bool edge_x, edge_y, edge_z;    // whether the particle is too close to the domain boundaries
+    real frac_x, frac_y, frac_z;    // the fraction of a particle NOT shared by the cell after interpolation
+    real deci_x, deci_y, deci_z;    // the decimal value of particle locations in the cell-index coordinates
+    real cent_x, cent_y, cent_z;    // the location of the center of the cell  in the cell-index coordinates
+    int  next_x, next_y, next_z;    // the distance to the neighboring cell    in the cell-index coordinates
 
-    deci_azi = par_azi - floor(par_azi);
-    deci_rad = par_rad - floor(par_rad);
-    deci_col = par_col - floor(par_col);
+    deci_x = loc_x - floor(loc_x);
+    deci_y = loc_y - floor(loc_y);
+    deci_z = loc_z - floor(loc_z);
 
-    cent_azi = 0.5;
-    cent_rad = 1.0;
-    cent_col = 0.5;
+    real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y)); // exponential base for logarithmic spacing
 
-    // "cent_rad = 1.0" means that values are defined at the outer radial edge of the cell
-    // however, this means particles at radial edge cells will get 100% self-shadowing effect
+    cent_x = 0.5;
+    cent_y = 1.0;
+    cent_z = 0.5;
 
-    bool inside_azi = par_azi >= cent_azi && par_azi < RES_AZI + cent_azi - 1.0;
-    bool inside_rad = par_rad >= cent_rad && par_rad < RES_RAD + cent_rad - 1.0;
-    bool inside_col = par_col >= cent_col && par_col < RES_COL + cent_col - 1.0;
-
-    if (inside_azi)
+    if (N_X == 1)                   // if there is only one cell in X
     {
-        if (deci_azi >= cent_azi)
-        {
-            frac_azi = deci_azi - cent_azi;
-            next_azi = 1;
-        }
-        else
-        {
-            frac_azi = cent_azi - deci_azi;
-            next_azi = -1;
-        }
+        frac_x = 0;                 // the share for the current cell is '1.0 - frac_x'
+        next_x = 0;                 // no other cells to share the particle
     }
     else
     {
-        if (deci_azi >= cent_azi)
+        edge_x = loc_x < cent_x || loc_x > N_X - cent_x;
+
+        if (not edge_x)             // still in the interior of the X domain
         {
-            frac_azi = deci_azi - cent_azi;
-            next_azi = 1 - RES_AZI;
+            if (deci_x >= cent_x)   // share with the cell on the right
+            {
+                frac_x = deci_x - cent_x;
+                next_x = 1;
+            }
+            else                    // share with the cell on the left
+            {
+                frac_x = cent_x - deci_x;
+                next_x = -1;
+            }
         }
-        else
+        else                        // too close to the inner or the outer X boundary 
         {
-            frac_azi = cent_azi - deci_azi;
-            next_azi = RES_AZI - 1;
+            if (deci_x >= cent_x)   // too close to the outer X boundary
+            {
+                frac_x = deci_x - cent_x;
+                next_x = 1 - N_X;   // share with the first cell of its row
+            }
+            else                    // too close to the inner X boundary
+            {
+                frac_x = cent_x - deci_x;
+                next_x = N_X - 1;   // share with the last  cell of its row
+            }
         }
     }
 
-    if (inside_rad)
+    if (N_Y == 1)                   // if there is only one cell in Y
     {
-        frac_rad = (pow(d_rad, 3.0) - pow(d_rad, 3.0*deci_rad)) / (pow(d_rad, 3.0) - 1.0);
-        next_rad = -RES_AZI;
+        frac_y = 0;                 // the share for the current cell is '1.0 - frac_y'
+        next_y = 0;                 // no other cells to share the particle
     }
     else
     {
-        frac_rad = (pow(d_rad, 3.0) - pow(d_rad, 3.0*deci_rad)) / (pow(d_rad, 3.0) - 1.0);
-        next_rad = 0;
+        edge_y = loc_y < cent_y;
+
+        if (not edge_y)
+        {
+            frac_y = (dy - pow(dy, deci_y)) / (dy - 1.0);
+            next_y = - N_X;         // share with the cell on its left
+        }
+        else                        // if the particle is in the innermost radial layer
+        {
+            frac_y = (dy - pow(dy, deci_y)) / (dy - 1.0);
+            next_y = 0;             // the particles are unfortunately 100% self-shadowed
+        }
     }
-    
-    if (inside_col)
+
+    if (N_Z == 1)                   // if there is only one cell in Z
     {
-        if (deci_col >= cent_col)
-        {
-            frac_col = deci_col - cent_col;
-            next_col = NUM_COL;
-        }
-        else
-        {
-            frac_col = cent_col - deci_col;
-            next_col = -NUM_COL;
-        }
+        frac_z = 0;                 // the share for the current cell is '1.0 - frac_z'
+        next_z = 0;                 // no other cells to share the particle
     }
     else
     {
-        if (deci_col >= cent_col)
+        edge_z = loc_z < cent_z || loc_z > N_Z - cent_z;
+        
+        if (not edge_z)             // still in the interior of the Z domain
         {
-            frac_col = deci_col - cent_col;
-            next_col = 0;
+            if (deci_z >= cent_z)
+            {
+                frac_z = deci_z - cent_z;
+                next_z = NG_XY;    // the index distance to the next Z cell on the right is N_X*N_Y = NG_XY
+            }
+            else
+            {
+                frac_z = cent_z - deci_z;
+                next_z = - NG_XY;
+            }
         }
-        else
+        else                        // at the Z domain boundaries, the current cell take it all like N_Z = 1
         {
-            frac_col = cent_col - deci_col;
-            next_col = 0;
+            frac_z = 0;
+            next_z = 0;
         }
     }
 
     interp result;
 
-    result.next_azi = next_azi;
-    result.next_rad = next_rad;
-    result.next_col = next_col;
-    result.frac_azi = frac_azi;
-    result.frac_rad = frac_rad;
-    result.frac_col = frac_col;
+    result.next_x = next_x;
+    result.next_y = next_y;
+    result.next_z = next_z;
+    result.frac_x = frac_x;
+    result.frac_y = frac_y;
+    result.frac_z = frac_z;
 
     return result;
+}
+
+// =========================================================================================================================
+
+__device__
+real _get_optdepth (real *dev_optdepth, real loc_x, real loc_y, real loc_z)
+{
+    real optdepth = 0.0;
+
+    bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
+    bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
+    bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
+
+    if (in_x && in_y && in_z)
+    {
+        interp result = _linear_interp_edge(loc_x, loc_y, loc_z);
+
+        int  next_x = result.next_x;
+        int  next_y = result.next_y;
+        int  next_z = result.next_z;
+        real frac_x = result.frac_x;
+        real frac_y = result.frac_y;
+        real frac_z = result.frac_z;
+
+        int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+
+        optdepth += dev_optdepth[idx_cell                           ]*(1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z);
+        optdepth += dev_optdepth[idx_cell + next_x                  ]*       frac_x *(1.0 - frac_y)*(1.0 - frac_z);
+        optdepth += dev_optdepth[idx_cell          + next_y         ]*(1.0 - frac_x)*       frac_y *(1.0 - frac_z);
+        optdepth += dev_optdepth[idx_cell + next_x + next_y         ]*       frac_x *       frac_y *(1.0 - frac_z);
+        optdepth += dev_optdepth[idx_cell                   + next_z]*(1.0 - frac_x)*(1.0 - frac_y)*       frac_z ;
+        optdepth += dev_optdepth[idx_cell + next_x          + next_z]*       frac_x *(1.0 - frac_y)*       frac_z ;
+        optdepth += dev_optdepth[idx_cell          + next_y + next_z]*(1.0 - frac_x)*       frac_y *       frac_z ;
+        optdepth += dev_optdepth[idx_cell + next_x + next_y + next_z]*       frac_x *       frac_y *       frac_z ;
+    }
+    else if (loc_y < 0)
+    {
+        optdepth = 0;
+    }
+    else
+    {
+        optdepth = DBL_MAX;
+    }
+
+    return optdepth;
 }

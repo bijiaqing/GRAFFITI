@@ -13,37 +13,39 @@ std::mt19937 rand_generator;
 int main (int argc, char **argv)
 {
     int resume;
+    
     real timer = 0.0;
-    real output_timer = 0.0;
+    real dynamics_timer = 0.0;
+    real filesave_timer = 0.0;
     
     std::string fname;
     std::ofstream ofile;
     std::uniform_real_distribution <real> random(0.0, 1.0); // distribution in [0, 1)
 
     swarm *particle, *dev_particle;
-    cudaMallocHost((void**)&particle, sizeof(swarm)*NUM_PAR);
-    cudaMalloc((void**)&dev_particle, sizeof(swarm)*NUM_PAR);
+    cudaMallocHost((void**)&particle, sizeof(swarm)*N_PAR);
+    cudaMalloc((void**)&dev_particle, sizeof(swarm)*N_PAR);
     
     real *dustdens, *dev_dustdens;
-    cudaMallocHost((void**)&dustdens, sizeof(real)*NUM_DIM);
-    cudaMalloc((void**)&dev_dustdens, sizeof(real)*NUM_DIM);
+    cudaMallocHost((void**)&dustdens, sizeof(real)*N_GRD);
+    cudaMalloc((void**)&dev_dustdens, sizeof(real)*N_GRD);
 
     real *optdepth, *dev_optdepth;
-    cudaMallocHost((void**)&optdepth, sizeof(real)*NUM_DIM);
-    cudaMalloc((void**)&dev_optdepth, sizeof(real)*NUM_DIM);
+    cudaMallocHost((void**)&optdepth, sizeof(real)*N_GRD);
+    cudaMalloc((void**)&dev_optdepth, sizeof(real)*N_GRD);
 
     real *dev_col_rand, *dev_col_real;
-    cudaMalloc((void**)&dev_col_rand, sizeof(real)*NUM_DIM);
-    cudaMalloc((void**)&dev_col_real, sizeof(real)*NUM_DIM);
+    cudaMalloc((void**)&dev_col_rand, sizeof(real)*N_GRD);
+    cudaMalloc((void**)&dev_col_real, sizeof(real)*N_GRD);
 
     real *dev_col_rate;
-    cudaMalloc((void**)&dev_col_rate, sizeof(real)*NUM_DIM);
+    cudaMalloc((void**)&dev_col_rate, sizeof(real)*N_GRD);
 
     tree *dev_treenode;
-    cudaMalloc((void**)&dev_treenode, sizeof(tree)*NUM_PAR);
+    cudaMalloc((void**)&dev_treenode, sizeof(tree)*N_PAR);
 
     int *dev_col_flag;
-    cudaMalloc((void**)&dev_col_flag, sizeof(int)*NUM_DIM);
+    cudaMalloc((void**)&dev_col_flag, sizeof(int)*N_GRD);
 
     float *max_rate, *dev_max_rate;
     cudaMallocHost((void**)&max_rate, sizeof(float));
@@ -56,88 +58,87 @@ int main (int argc, char **argv)
     boxf *dev_boundbox;
     cudaMalloc((void**)&dev_boundbox, sizeof(boxf));
 
-    curandState *dev_rngs_par, *dev_rngs_dim;
-    cudaMalloc((void**)&dev_rngs_par, sizeof(curandState)*NUM_PAR);
-    cudaMalloc((void**)&dev_rngs_dim, sizeof(curandState)*NUM_DIM);
+    curandState *dev_rngs_par, *dev_rngs_grd;
+    cudaMalloc((void**)&dev_rngs_par, sizeof(curandState)*N_PAR);
+    cudaMalloc((void**)&dev_rngs_grd, sizeof(curandState)*N_GRD);
 
-    if (argc <= 1) // no flag, start from the initial condition
+    // auto start = std::chrono::system_clock::now();
+    // cudaDeviceSynchronize();
+    // auto end = std::chrono::system_clock::now();
+    // std::chrono::duration<double> elapsed_seconds = end - start;
+    // std::cout << "elapsed time: " << elapsed_seconds.count() << "s" << std::endl;
+
+    if (argc <= 1) // no flag, fresh start
 	{
         resume = 0;
 
-        real *prof_azi, *dev_prof_azi;
-        real *prof_rad, *dev_prof_rad;
-        real *prof_col, *dev_prof_col;
-        real *prof_siz, *dev_prof_siz;
-        cudaMallocHost((void**)&prof_azi, sizeof(real)*NUM_PAR);
-        cudaMalloc((void**)&dev_prof_azi, sizeof(real)*NUM_PAR);
-        cudaMallocHost((void**)&prof_rad, sizeof(real)*NUM_PAR);
-        cudaMalloc((void**)&dev_prof_rad, sizeof(real)*NUM_PAR);
-        cudaMallocHost((void**)&prof_col, sizeof(real)*NUM_PAR);
-        cudaMalloc((void**)&dev_prof_col, sizeof(real)*NUM_PAR);
-        cudaMallocHost((void**)&prof_siz, sizeof(real)*NUM_PAR);
-        cudaMalloc((void**)&dev_prof_siz, sizeof(real)*NUM_PAR);
+        // for initialization
+        real *random_x, *dev_random_x;
+        real *random_y, *dev_random_y;
+        real *random_z, *dev_random_z;
+        real *random_s, *dev_random_s;
+        
+        cudaMallocHost((void**)&random_x, sizeof(real)*N_PAR); cudaMalloc((void**)&dev_random_x, sizeof(real)*N_PAR);
+        cudaMallocHost((void**)&random_y, sizeof(real)*N_PAR); cudaMalloc((void**)&dev_random_y, sizeof(real)*N_PAR);
+        cudaMallocHost((void**)&random_z, sizeof(real)*N_PAR); cudaMalloc((void**)&dev_random_z, sizeof(real)*N_PAR);
+        cudaMallocHost((void**)&random_s, sizeof(real)*N_PAR); cudaMalloc((void**)&dev_random_s, sizeof(real)*N_PAR);
 
         rand_generator.seed(0); // or use rand_generator.seed(std::time(NULL));
 
-        rand_uniform  (prof_azi, NUM_PAR, AZI_INIT_MIN,  AZI_INIT_MAX);
-        rand_conv_pow (prof_rad, NUM_PAR, RAD_INIT_MIN,  RAD_INIT_MAX, IDX_SIGMAG - 1.0, SMOOTH_RAD, RES_RAD);
-        rand_uniform  (prof_col, NUM_PAR, COL_INIT_MIN,  COL_INIT_MAX);
-        rand_powerlaw (prof_siz, NUM_PAR, SIZE_INIT_MIN, SIZE_INIT_MAX, -1.5); // pow_idx = -1.5 is explained in init.cu
+        rand_uniform(random_x, N_PAR, INIT_XMIN, INIT_XMAX);
+        rand_convpow(random_y, N_PAR, INIT_YMIN, INIT_YMAX, IDX_SURF - 1.0, 0.05*R_0, N_Y);
+        rand_uniform(random_z, N_PAR, INIT_ZMIN, INIT_ZMAX);
+        rand_pow_law(random_s, N_PAR, INIT_SMIN, INIT_SMAX, -1.5); // pow_idx is explained in init.cu
 
-        cudaMemcpy(dev_prof_azi, prof_azi, sizeof(real)*NUM_PAR, cudaMemcpyHostToDevice);
-        cudaMemcpy(dev_prof_rad, prof_rad, sizeof(real)*NUM_PAR, cudaMemcpyHostToDevice);
-        cudaMemcpy(dev_prof_col, prof_col, sizeof(real)*NUM_PAR, cudaMemcpyHostToDevice);
-        cudaMemcpy(dev_prof_siz, prof_siz, sizeof(real)*NUM_PAR, cudaMemcpyHostToDevice);
+        cudaMemcpy(dev_random_x, random_x, sizeof(real)*N_PAR, cudaMemcpyHostToDevice);
+        cudaMemcpy(dev_random_y, random_y, sizeof(real)*N_PAR, cudaMemcpyHostToDevice);
+        cudaMemcpy(dev_random_z, random_z, sizeof(real)*N_PAR, cudaMemcpyHostToDevice);
+        cudaMemcpy(dev_random_s, random_s, sizeof(real)*N_PAR, cudaMemcpyHostToDevice);
 
-        particle_init <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_prof_azi, dev_prof_rad, dev_prof_col, dev_prof_siz);
+        particle_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_random_x, dev_random_y, dev_random_z, dev_random_s);
 
-        cudaFreeHost(prof_azi); cudaFree(dev_prof_azi);
-        cudaFreeHost(prof_rad); cudaFree(dev_prof_rad);
-        cudaFreeHost(prof_col); cudaFree(dev_prof_col);
-        cudaFreeHost(prof_siz); cudaFree(dev_prof_siz);
+        cudaFreeHost(random_x); cudaFree(dev_random_x);
+        cudaFreeHost(random_y); cudaFree(dev_random_y);
+        cudaFreeHost(random_z); cudaFree(dev_random_z);
+        cudaFreeHost(random_s); cudaFree(dev_random_s);
 
-        // auto start = std::chrono::system_clock::now();
-        // cudaDeviceSynchronize();
-        // auto end = std::chrono::system_clock::now();
-        // std::chrono::duration<double> elapsed_seconds = end - start;
-        // std::cout << "elapsed time: " << elapsed_seconds.count() << "s" << std::endl;
+        optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);                   // set all optical depth data to zero
+        optdepth_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);     // add particle contribution to cells
+        optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);                   // calculate the optical thickness of each cell
+        optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);                   // integrate in Y direction to get optical depth
+        optdepth_mean <<< NB_X, THREADS_PER_BLOCK >>> (dev_optdepth);                   // do azimuthal averaging for initial condition
 
-        optdepth_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_optdepth);
-        optdepth_enum <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_optdepth, dev_particle);
-        optdepth_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_optdepth);
-        optdepth_inte <<<BLOCKNUM_RAD, THREADS_PER_BLOCK>>> (dev_optdepth);
-        optdepth_mean <<<BLOCKNUM_AZI, THREADS_PER_BLOCK>>> (dev_optdepth);
+        velocity_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle);                   // initialize particle velocity after optical depth calculation
         
-        dustdens_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_dustdens);
-        dustdens_enum <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_dustdens, dev_particle);
-        dustdens_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_dustdens);
+        dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // this process cannot be merged with the above
+        dustdens_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
+        dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // of each particle may differ
         
-        velocity_init <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_optdepth);
-        rngs_par_init <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_rngs_par);
-        rngs_dim_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_rngs_dim);
+        rngs_par_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rngs_par);
+        rngs_grd_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rngs_grd);
 
-        mkdir(OUTPUT_PATH.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        mkdir(PATH_FILESAVE.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
-        open_txt_file(ofile, OUTPUT_PATH + "variables.txt");
+        open_txt_file(ofile, PATH_FILESAVE + "variables.txt");
         save_variable(ofile);
 
-        // cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*NUM_DIM, cudaMemcpyDeviceToHost);
-        // fname = OUTPUT_PATH + "dustdens_" + frame_num(resume) + ".bin";
-        // open_bin_file(ofile, fname);
-        // save_bin_file(ofile, dustdens, NUM_DIM);
-
-        // cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*NUM_DIM, cudaMemcpyDeviceToHost);
-        // fname = OUTPUT_PATH + "optdepth_" + frame_num(resume) + ".bin";
-        // open_bin_file(ofile, fname);
-        // save_bin_file(ofile, optdepth, NUM_DIM);
-
-        cudaMemcpy(particle, dev_particle, sizeof(swarm)*NUM_PAR, cudaMemcpyDeviceToHost);
-        fname = OUTPUT_PATH + "particle_" + frame_num(resume) + ".par";
+        cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
+        fname = PATH_FILESAVE + "dustdens_" + frame_num(resume) + ".bin";
         open_bin_file(ofile, fname);
-        save_bin_file(ofile, particle, NUM_PAR);
+        save_bin_file(ofile, dustdens, N_GRD);
+
+        cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
+        fname = PATH_FILESAVE + "optdepth_" + frame_num(resume) + ".bin";
+        open_bin_file(ofile, fname);
+        save_bin_file(ofile, optdepth, N_GRD);
+
+        cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
+        fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".par";
+        open_bin_file(ofile, fname);
+        save_bin_file(ofile, particle, N_PAR);
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::cout << std::setw(3) << std::setfill('0') << 0 << "/" << std::setw(3) << std::setfill('0') << OUTPUT_NUM << " finished on " << std::ctime(&end_time);
+        std::cout << std::setw(3) << std::setfill('0') << 0 << "/" << std::setw(3) << std::setfill('0') << FILENUM_MAX << " finished on " << std::ctime(&end_time);
     }
     else
     {
@@ -145,94 +146,101 @@ int main (int argc, char **argv)
         if (!(convert >> resume)) resume = -1;  // do the conversion, if conversion fails, set resume to a default value
 
         std::ifstream ifile;
-        fname = OUTPUT_PATH + "particle_" + frame_num(resume) + ".bin";
+        fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".bin";
         load_bin_file(ifile, fname);
-        read_bin_file(ifile, particle, NUM_PAR);
-        cudaMemcpy(dev_particle, particle, sizeof(swarm)*NUM_PAR,  cudaMemcpyHostToDevice);
+        read_bin_file(ifile, particle, N_PAR);
+        cudaMemcpy(dev_particle, particle, sizeof(swarm)*N_PAR,  cudaMemcpyHostToDevice);
 
-        optdepth_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_optdepth);
-        optdepth_enum <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_optdepth, dev_particle);
-        optdepth_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_optdepth);
-        optdepth_inte <<<BLOCKNUM_RAD, THREADS_PER_BLOCK>>> (dev_optdepth);
+        optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+        optdepth_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
+        optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+        optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
 
-        rngs_par_init <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_rngs_par);
-        rngs_dim_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_rngs_dim);
+        rngs_par_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rngs_par);
+        rngs_grd_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rngs_grd);
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::cout << std::setw(3) << std::setfill('0') << resume << "/" << std::setw(3) << std::setfill('0') << OUTPUT_NUM << " finished on " << std::ctime(&end_time);
+        std::cout << std::setw(3) << std::setfill('0') << resume << "/" << std::setw(3) << std::setfill('0') << FILENUM_MAX << " finished on " << std::ctime(&end_time);
     }
 
-    // for test use
-    treenode_init <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_treenode);
-    cukd::buildTree <tree, tree_traits> (dev_treenode, NUM_PAR, dev_boundbox);
-
-    for (int i = 1 + resume; i <= OUTPUT_NUM; i++)
+    for (int idx_file = 1 + resume; idx_file <= FILENUM_MAX; idx_file++)    // main evolution loop
     {
-        while (output_timer < OUTPUT_INT)
+        while (filesave_timer < DT_FILESAVE)                                // evolve particle dynamics until one output timestep
         {
-            // treenode_init <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_treenode);
-            // cukd::buildTree <tree, tree_traits> (dev_treenode, NUM_PAR, dev_boundbox);                                                  // 250 ms!!
+            treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode);
+            cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);    // takes 250 ms!!
             
-            col_rate_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_col_rate, dev_col_rand, dev_col_real, dev_max_rate);
-            col_rate_calc <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_treenode, dev_col_rate, dev_boundbox);
-            col_rate_peak <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_col_rate, dev_max_rate);
-            
-            cudaMemcpy(max_rate, dev_max_rate, sizeof(float), cudaMemcpyDeviceToHost);
-            *timestep = 1.0 / static_cast<real>(*max_rate);
-            // *timestep = -std::log(1.0 - random(rand_generator)) / static_cast<real>(*max_rate);
-            // if (*timestep > DT_MAX) *timestep = DT_MAX;
-            if (*timestep > OUTPUT_INT - output_timer) *timestep = OUTPUT_INT - output_timer;
-            cudaMemcpy(dev_timestep, timestep, sizeof(real), cudaMemcpyHostToDevice);
+            while (dynamics_timer < DT_DYNAMICS)                            // evolve grain collision until one dynamical timestep
+            {
+                col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_real, dev_max_rate);
+                col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_rate, dev_boundbox);
+                col_rate_peak <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_max_rate);
+                
+                cudaMemcpy(max_rate, dev_max_rate, sizeof(float), cudaMemcpyDeviceToHost);
+                
+                *timestep = 1.0 / static_cast<real>(*max_rate);
+                
+                if (*timestep > DT_DYNAMICS)                  *timestep = DT_DYNAMICS;
+                if (*timestep > DT_DYNAMICS - dynamics_timer) *timestep = DT_DYNAMICS - dynamics_timer;
+                if (*timestep > DT_FILESAVE - filesave_timer) *timestep = DT_FILESAVE - filesave_timer;
 
-            col_flag_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_col_rate, dev_col_rand, dev_col_flag, dev_timestep, dev_rngs_dim);
-            par_evol_calc <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_treenode, dev_col_flag, dev_col_rand, dev_col_real, dev_boundbox, dev_rngs_par);
+                cudaMemcpy(dev_timestep, timestep, sizeof(real), cudaMemcpyHostToDevice);
 
-            // ssa_substep_1 <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_timestep);
-            // optdepth_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_optdepth);
-            // optdepth_enum <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_optdepth, dev_particle);
-            // optdepth_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_optdepth);
-            // optdepth_inte <<<BLOCKNUM_RAD, THREADS_PER_BLOCK>>> (dev_optdepth);
-            // ssa_substep_2 <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_particle, dev_optdepth, dev_timestep);
+                col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_flag, dev_timestep, dev_rngs_grd);
+                particle_evol <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_flag, dev_col_rand, dev_col_real, dev_boundbox, dev_rngs_par);
 
-            timer        += *timestep;
-            output_timer += *timestep;
+                cudaDeviceSynchronize();  // Ensure collisions are processed before next iteration
 
-            std::cout << std::setprecision(6) << std::scientific << *timestep << ' ' << output_timer << ' ' << timer << std::endl;
+                timer          += *timestep;
+                dynamics_timer += *timestep;
+                filesave_timer += *timestep;
+            }
+
+            dynamics_timer = 0.0;
+
+            ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle);
+            optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+            optdepth_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
+            optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+            optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
+            ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth);
+            pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par);
+
+            cudaDeviceSynchronize();  // Ensure positions updated before next iteration
+
+            std::cout << std::setprecision(6) << std::scientific << *timestep << ' ' << filesave_timer << ' ' << timer << std::endl;
         }
     
-        output_timer = 0.0;
+        filesave_timer = 0.0;
     
-        // // calculate dustdens grids for each output
-        // dustdens_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_dustdens);
-        // dustdens_enum <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_dustdens, dev_particle);
-        // dustdens_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_dustdens);
+        // calculate dustdens grids for each output
+        dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
+        dustdens_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);
+        dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
 
-        // cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*NUM_DIM, cudaMemcpyDeviceToHost);
-        // fname = OUTPUT_PATH + "dustdens_" + frame_num(i) + ".bin";
-        // open_bin_file(ofile, fname);
-        // save_bin_file(ofile, dustdens, NUM_DIM);
+        cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
+        fname = PATH_FILESAVE + "dustdens_" + frame_num(idx_file) + ".bin";
+        open_bin_file(ofile, fname); save_bin_file(ofile, dustdens, N_GRD);
 
-        // // calculate optical depth grids for each output
-        // optdepth_init <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_optdepth);
-        // optdepth_enum <<<BLOCKNUM_PAR, THREADS_PER_BLOCK>>> (dev_optdepth, dev_particle);
-        // optdepth_calc <<<BLOCKNUM_DIM, THREADS_PER_BLOCK>>> (dev_optdepth);
-        // optdepth_inte <<<BLOCKNUM_RAD, THREADS_PER_BLOCK>>> (dev_optdepth);
+        // calculate optical depth grids for each output
+        optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+        optdepth_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
+        optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+        optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
 
-        // cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*NUM_DIM, cudaMemcpyDeviceToHost);
-        // fname = OUTPUT_PATH + "optdepth_" + frame_num(i) + ".bin";
-        // open_bin_file(ofile, fname);
-        // save_bin_file(ofile, optdepth, NUM_DIM);
+        cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
+        fname = PATH_FILESAVE + "optdepth_" + frame_num(idx_file) + ".bin";
+        open_bin_file(ofile, fname); save_bin_file(ofile, optdepth, N_GRD);
 
-        if (i % OUTPUT_PAR == 0)
+        if (idx_file % SWARM_EVERY == 0)
         {
-            cudaMemcpy(particle, dev_particle, sizeof(swarm)*NUM_PAR, cudaMemcpyDeviceToHost);
-            fname = OUTPUT_PATH + "particle_" + frame_num(i) + ".par";
-            open_bin_file(ofile, fname);
-            save_bin_file(ofile, particle, NUM_PAR);
+            cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
+            fname = PATH_FILESAVE + "particle_" + frame_num(idx_file) + ".par";
+            open_bin_file(ofile, fname); save_bin_file(ofile, particle, N_PAR);
         }
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::cout << std::setw(3) << std::setfill('0') << i << "/" << std::setw(3) << std::setfill('0') << OUTPUT_NUM << " finished on " << std::ctime(&end_time);
+        std::cout << std::setw(3) << std::setfill('0') << idx_file << "/" << std::setw(3) << std::setfill('0') << FILENUM_MAX << " finished on " << std::ctime(&end_time);
     }
  
     return 0;

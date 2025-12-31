@@ -97,7 +97,7 @@ namespace cukd {
   float atomicMin(float *addr, float value)
   {
     float old = *addr, assumed;
-    if(old <= value) return old;
+    if (old <= value) return old;
     do {
       assumed = old;
       old = __int_as_float(atomicCAS((unsigned int*)addr, __float_as_int(assumed), __float_as_int(value)));
@@ -110,7 +110,7 @@ namespace cukd {
   float atomicMax(float *addr, float value)
   {
     float old = *addr, assumed;
-    if(old >= value) return old;
+    if (old >= value) return old;
     do {
       assumed = old;
       old = __int_as_float(atomicCAS((unsigned int*)addr, __float_as_int(assumed), __float_as_int(value)));
