@@ -20,23 +20,23 @@ std::string frame_num (int number, std::size_t length)  // the length is set to 
 
 // =========================================================================================================================
 
-template<typename T>
-bool save_binary (const std::string &file_name, T *data, int number)
+template <typename DataType> __host__
+bool save_binary (const std::string &file_name, DataType *data, int number)
 {
     std::ofstream file(file_name, std::ios::binary);
     if (!file) return false;
     
-    file.write(reinterpret_cast<char*>(data), sizeof(T) * number);
+    file.write(reinterpret_cast<char*>(data), sizeof(DataType)*number);
     return file.good();
 }
 
-template<typename T>
-bool load_binary (const std::string &file_name, T *data, int number)
+template <typename DataType> __host__
+bool load_binary (const std::string &file_name, DataType *data, int number)
 {
     std::ifstream file(file_name, std::ios::binary);
     if (!file) return false;
     
-    file.read(reinterpret_cast<char*>(data), sizeof(T) * number);
+    file.read(reinterpret_cast<char*>(data), sizeof(DataType)*number);
     return file.good();
 }
 

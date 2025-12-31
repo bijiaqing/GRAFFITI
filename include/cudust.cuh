@@ -51,21 +51,19 @@ __global__ void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par);
 // interpolation
 
 __device__ interp _linear_interp_cent (real loc_x, real loc_y, real loc_z);
-__device__ interp _linear_interp_edge (real loc_x, real loc_y, real loc_z);
 
 __device__ real _get_optdepth (real *dev_optdepth, real loc_x, real loc_y, real loc_z);
-__device__ real _col_rate_ij (swarm *dev_particle, int idx_old_i, int idx_old_j);
 
 // =========================================================================================================================
 // files open and save
 
 __host__ std::string frame_num (int number, std::size_t length = 5);
 
-template<typename T>
-bool save_binary (const std::string &file_name, T *data, int number);
+template <typename DataType> __host__
+bool save_binary (const std::string &file_name, DataType *data, int number);
 
-template<typename T>
-bool load_binary (const std::string &file_name, T *data, int number);
+template <typename DataType> __host__
+bool load_binary (const std::string &file_name, DataType *data, int number);
 
 __host__ bool save_variable (const std::string &file_name);
 

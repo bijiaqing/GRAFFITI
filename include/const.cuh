@@ -125,6 +125,12 @@ struct interp
     real frac_x, frac_y, frac_z;
 };
 
+enum GridFieldType
+{ 
+    OPTDEPTH,   // optical depth field
+    DUSTDENS,   // dust density field
+};
+
 // =========================================================================================================================
 // cuda numerical parameters
 

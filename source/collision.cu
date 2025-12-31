@@ -79,10 +79,7 @@ void col_rate_calc (swarm *dev_particle, tree *dev_treenode, real *dev_col_rate,
         bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
         bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
 
-        if (!(in_x && in_y && in_z))
-        {
-            return; // particle is out of bounds, do nothing
-        }
+        if (!(in_x && in_y && in_z)) return; // particle is out of bounds, do nothing
 
         int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
         
