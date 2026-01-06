@@ -68,7 +68,7 @@ __host__ void rand_convpow  (real *profile, int number, real p_min, real p_max, 
 // files open and save
 // functions are defined here because template functions cannot be defined in .cu files
 
-__host__
+__host__ inline
 std::string frame_num (int number, std::size_t length = 5)
 {
     std::string str = std::to_string(number);
@@ -105,7 +105,7 @@ bool load_binary (const std::string &file_name, DataType *data, int number)
     return file.good();
 }
 
-__host__
+__host__ inline
 bool save_variable (const std::string &file_name)
 {
     std::ofstream file(file_name);

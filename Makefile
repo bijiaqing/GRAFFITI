@@ -2,6 +2,8 @@ IDIR = ./include
 ODIR = ./object
 SDIR = ./source
 
+EXEC = cuDust
+
 CC = nvcc -arch=sm_80
 CFLAGS = -I $(IDIR)
 
@@ -11,32 +13,18 @@ DEPS = $(patsubst %, $(IDIR)/%, $(_DEPS))
 _OBJ = collision.o initialize.o integrator.o interpolate.o main.o mesh.o profiles.o 
 OBJ = $(patsubst %, $(ODIR)/%, $(_OBJ))
 
-all: cuDust
+.PHONY: all clean
 
-cuDust: $(OBJ)
+all: $(EXEC)
+
+$(EXEC): $(OBJ)
 	$(CC) -o $@ $^
 
-$(ODIR)/collision.o: $(SDIR)/collision.cu $(DEPS)
+$(ODIR)/%.o: $(SDIR)/%.cu $(DEPS) | $(ODIR)
 	$(CC) --device-c -o $@ $< $(CFLAGS)
 
-$(ODIR)/initialize.o: $(SDIR)/initialize.cu $(DEPS)
-	$(CC) --device-c -o $@ $< $(CFLAGS)
-
-$(ODIR)/integrator.o: $(SDIR)/integrator.cu $(DEPS)
-	$(CC) --device-c -o $@ $< $(CFLAGS)
-
-$(ODIR)/interpolate.o: $(SDIR)/interpolate.cu $(DEPS)
-	$(CC) --device-c -o $@ $< $(CFLAGS)
-
-$(ODIR)/main.o: $(SDIR)/main.cu $(DEPS)
-	$(CC) --device-c -o $@ $< $(CFLAGS)
-
-$(ODIR)/mesh.o: $(SDIR)/mesh.cu $(DEPS)
-	$(CC) --device-c -o $@ $< $(CFLAGS)
-
-$(ODIR)/profiles.o: $(SDIR)/profiles.cu $(DEPS)
-	$(CC) --device-c -o $@ $< $(CFLAGS)
+$(ODIR):
+	mkdir -p $(ODIR)
 
 clean:
-	rm cuDust outputs/* $(OBJ)
-
+	rm -f $(EXEC) $(OBJ)

@@ -211,8 +211,8 @@ void particle_evol (swarm *dev_particle, tree *dev_treenode, int *dev_col_flag, 
             real col_real_ij = 0.0;
 
             real rel_velocity = 0.0; 
-            real rms_velocity = 0.0;
-            int rms_count = 0;
+            // real rms_velocity = 0.0;
+            // int rms_count = 0;
 
             // if particle idx_old_j *first* makes real > rand, it is the one that idx_old_i is going to collide with
             while (col_real_ij < col_rand_ij && j < KNN_SIZE)
