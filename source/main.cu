@@ -107,29 +107,29 @@ int main (int argc, char **argv)
         optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);                   // integrate in Y direction to get optical depth
         optdepth_mean <<< NB_X, THREADS_PER_BLOCK >>> (dev_optdepth);                   // do azimuthal averaging for initial condition
 
-        velocity_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle);                   // initialize particle velocity after optical depth calculation
+        velocity_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth);     // initialize particle velocity after optical depth calculation
         
         dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // this process cannot be merged with the above
         dustdens_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
         dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // of each particle may differ
         
-        rngs_par_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rngs_par);
-        rngs_grd_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rngs_grd);
+        // rngs_par_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rngs_par);
+        // rngs_grd_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rngs_grd);
 
         mkdir(PATH_FILESAVE.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
         save_variable(PATH_FILESAVE + "variables.txt");
 
         cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "dustdens_" + frame_num(resume) + ".bin";
+        fname = PATH_FILESAVE + "dustdens_" + frame_num(resume) + ".dat";
         save_binary(fname, dustdens, N_GRD);
 
         cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "optdepth_" + frame_num(resume) + ".bin";
+        fname = PATH_FILESAVE + "optdepth_" + frame_num(resume) + ".dat";
         save_binary(fname, optdepth, N_GRD);
 
         cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".par";
+        fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".dat";
         save_binary(fname, particle, N_PAR);
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -140,7 +140,7 @@ int main (int argc, char **argv)
         std::stringstream convert{argv[1]};     // set up a stringstream variable named convert, initialized with the input from argv[1]
         if (!(convert >> resume)) resume = -1;  // do the conversion, if conversion fails, set resume to a default value
 
-        fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".bin";
+        fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".dat";
         load_binary(fname, particle, N_PAR);
         cudaMemcpy(dev_particle, particle, sizeof(swarm)*N_PAR,  cudaMemcpyHostToDevice);
 
@@ -160,34 +160,37 @@ int main (int argc, char **argv)
     {
         while (filesave_timer < DT_FILESAVE)                                // evolve particle dynamics until one output timestep
         {
-            treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode);
-            cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);    // takes 250 ms!!
+            // treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode);
+            // cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);    // takes 250 ms!!
             
-            while (dynamics_timer < DT_DYNAMICS)                            // evolve grain collision until one dynamical timestep
-            {
-                col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_real, dev_max_rate);
-                col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_rate, dev_boundbox);
-                col_rate_peak <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_max_rate);
+            // while (dynamics_timer < DT_DYNAMICS)                            // evolve grain collision until one dynamical timestep
+            // {
+            //     col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_real, dev_max_rate);
+            //     col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_rate, dev_boundbox);
+            //     col_rate_peak <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_max_rate);
                 
-                cudaMemcpy(max_rate, dev_max_rate, sizeof(float), cudaMemcpyDeviceToHost);
+            //     cudaMemcpy(max_rate, dev_max_rate, sizeof(float), cudaMemcpyDeviceToHost);
                 
-                *timestep = 1.0 / static_cast<real>(*max_rate);
+            //     *timestep = 1.0 / static_cast<real>(*max_rate);
                 
-                if (*timestep > DT_DYNAMICS)                  *timestep = DT_DYNAMICS;
-                if (*timestep > DT_DYNAMICS - dynamics_timer) *timestep = DT_DYNAMICS - dynamics_timer;
-                if (*timestep > DT_FILESAVE - filesave_timer) *timestep = DT_FILESAVE - filesave_timer;
+            //     if (*timestep > DT_DYNAMICS)                  *timestep = DT_DYNAMICS;
+            //     if (*timestep > DT_DYNAMICS - dynamics_timer) *timestep = DT_DYNAMICS - dynamics_timer;
+            //     if (*timestep > DT_FILESAVE - filesave_timer) *timestep = DT_FILESAVE - filesave_timer;
 
-                cudaMemcpy(dev_timestep, timestep, sizeof(real), cudaMemcpyHostToDevice);
+            //     cudaMemcpy(dev_timestep, timestep, sizeof(real), cudaMemcpyHostToDevice);
 
-                col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_flag, dev_timestep, dev_rngs_grd);
-                particle_evol <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_flag, dev_col_rand, dev_col_real, dev_boundbox, dev_rngs_par);
+            //     col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_flag, dev_timestep, dev_rngs_grd);
+            //     particle_evol <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_flag, dev_col_rand, dev_col_real, dev_boundbox, dev_rngs_par);
 
-                cudaDeviceSynchronize();  // Ensure collisions are processed before next iteration
+            //     cudaDeviceSynchronize();  // Ensure collisions are processed before next iteration
 
-                timer          += *timestep;
-                dynamics_timer += *timestep;
-                filesave_timer += *timestep;
-            }
+            //     timer          += *timestep;
+            //     dynamics_timer += *timestep;
+            //     filesave_timer += *timestep;
+            // }
+
+            timer          += DT_DYNAMICS;  // for testing without collisions
+            filesave_timer += DT_DYNAMICS;  // for testing without collisions
 
             dynamics_timer = 0.0;
 
@@ -197,7 +200,7 @@ int main (int argc, char **argv)
             optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
             optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
             ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth);
-            pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par);
+            // pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par);
 
             cudaDeviceSynchronize();  // Ensure positions updated before next iteration
 
@@ -212,7 +215,7 @@ int main (int argc, char **argv)
         dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
 
         cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "dustdens_" + frame_num(idx_file) + ".bin";
+        fname = PATH_FILESAVE + "dustdens_" + frame_num(idx_file) + ".dat";
         save_binary(fname, dustdens, N_GRD);
 
         // calculate optical depth grids for each output
@@ -222,13 +225,13 @@ int main (int argc, char **argv)
         optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
 
         cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "optdepth_" + frame_num(idx_file) + ".bin";
+        fname = PATH_FILESAVE + "optdepth_" + frame_num(idx_file) + ".dat";
         save_binary(fname, optdepth, N_GRD);
 
         if (idx_file % SWARM_EVERY == 0)
         {
             cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
-            fname = PATH_FILESAVE + "particle_" + frame_num(idx_file) + ".par";
+            fname = PATH_FILESAVE + "particle_" + frame_num(idx_file) + ".dat";
             save_binary(fname, particle, N_PAR);
         }
 

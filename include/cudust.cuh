@@ -55,19 +55,6 @@ __device__ interp _linear_interp_cent (real loc_x, real loc_y, real loc_z);
 __device__ real _get_optdepth (real *dev_optdepth, real loc_x, real loc_y, real loc_z);
 
 // =========================================================================================================================
-// files open and save
-
-__host__ std::string frame_num (int number, std::size_t length = 5);
-
-template <typename DataType> __host__
-bool save_binary (const std::string &file_name, DataType *data, int number);
-
-template <typename DataType> __host__
-bool load_binary (const std::string &file_name, DataType *data, int number);
-
-__host__ bool save_variable (const std::string &file_name);
-
-// =========================================================================================================================
 // profile generators
 
 extern std::mt19937 rand_generator;
@@ -76,6 +63,61 @@ __host__ void rand_uniform  (real *profile, int number, real p_min, real p_max);
 __host__ void rand_gaussian (real *profile, int number, real p_min, real p_max, real p_0, real sigma);
 __host__ void rand_pow_law  (real *profile, int number, real p_min, real p_max, real idx_pow);
 __host__ void rand_convpow  (real *profile, int number, real p_min, real p_max, real idx_pow, real smooth, int bins);
+
+// =========================================================================================================================
+// files open and save
+// functions are defined here because template functions cannot be defined in .cu files
+
+__host__
+std::string frame_num (int number, std::size_t length = 5)
+{
+    std::string str = std::to_string(number);
+
+    if (str.length() < length)
+    {
+        str.insert(0, length - str.length(), '0');
+    }
+
+    return str;
+}
+
+template <typename DataType> __host__
+bool save_binary (const std::string &file_name, DataType *data, int number)
+{
+    std::ofstream file(file_name, std::ios::binary);
+    
+    if (!file) return false;
+    
+    file.write(reinterpret_cast<char*>(data), sizeof(DataType)*number);
+    
+    return file.good();
+}
+
+template <typename DataType> __host__
+bool load_binary (const std::string &file_name, DataType *data, int number)
+{
+    std::ifstream file(file_name, std::ios::binary);
+    
+    if (!file) return false;
+    
+    file.read(reinterpret_cast<char*>(data), sizeof(DataType)*number);
+    
+    return file.good();
+}
+
+__host__
+bool save_variable (const std::string &file_name)
+{
+    std::ofstream file(file_name);
+    
+    if (!file) return false;
+    
+    file << "[PARAMETERS]" << std::endl;
+    // file << "N_PAR = \t" << std::scientific << std::setprecision(15) 
+    //      << std::setw(24) << std::setfill(' ') << N_PAR << std::endl;
+    
+    return file.good();
+}
 
 // =========================================================================================================================
 

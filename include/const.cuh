@@ -33,7 +33,7 @@ const real  IDX_SURF    = -1.5;             // the power-law index of the gas su
 const real  S_0         = 1.0;              // the reference grain size of the dust
 const real  ST_0        = 1.0e-04;          // the reference Stokes number of the dust
 const real  BETA_0      = 1.0e+01;          // the reference ratio between the radiation pressure and the gravity
-const real  KAPPA_0     = 1.0;              // the reference gray opacity of the dust
+const real  KAPPA_0     = 1.0e+01;          // the reference gray opacity of the dust
 
 // =========================================================================================================================
 // dust parameters for coagulation
@@ -49,11 +49,11 @@ const float MAX_DIST = 0.05;                // the maximum distance for neighbor
 // =========================================================================================================================
 // mesh domain size and resolution
 
-const int   N_PAR         = 1e+07;          // total number of super-particles in the model
+const int   N_PAR       = 1e+06;            // total number of super-particles in the model
 
-const int   N_X         = 1;                // number of grid cells in X direction (azimuth)
-const real  X_MIN       = M_PI;             // minimum X boundary (azimuth)
-const real  X_MAX       = M_PI;             // maximum X boundary (azimuth)
+const int   N_X         = 100;              // number of grid cells in X direction (azimuth)
+const real  X_MIN       = 0.0*M_PI;         // minimum X boundary (azimuth)
+const real  X_MAX       = 2.0*M_PI;         // maximum X boundary (azimuth)
 
 const int   N_Y         = 100;              // number of grid cells in Y direction (radius)
 const real  Y_MIN       = 1.0;              // minimum Y boundary (radius)
@@ -75,13 +75,13 @@ const real INIT_YMAX    = Y_MAX;            // maximum Y boundary for particle i
 const real INIT_ZMIN    = Z_MIN;            // minimum Z boundary for particle initialization
 const real INIT_ZMAX    = Z_MAX;            // maximum Z boundary for particle initialization
 
-const real INIT_SMIN    = 0.01;             // minimum grain size for particle initialization
-const real INIT_SMAX    = 10.0;             // maximum grain size for particle initialization
+const real INIT_SMIN    = 1.0e+00;          // minimum grain size for particle initialization
+const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle initialization
 
 // =========================================================================================================================
 // time step and output parameters
 
-const int  FILENUM_MAX = 100;               // total number of outputs for mesh fields
+const int  FILENUM_MAX = 10;               // total number of outputs for mesh fields
 const int  SWARM_EVERY = 1;                 // save particle data every X mesh outputs
 
 const real DT_FILESAVE = 0.2*M_PI;          // time interval between adjascent outputs
