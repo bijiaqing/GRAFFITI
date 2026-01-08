@@ -115,31 +115,34 @@ int main (int argc, char **argv)
         rngs_par_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rngs_par);
         rngs_grd_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rngs_grd);
 
-        mkdir(PATH_FILESAVE.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        mkdir(PATH_OUT.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
-        save_variable(PATH_FILESAVE + "variables.txt");
+        save_variable(PATH_OUT + "variables.txt");
 
         cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "dustdens_" + frame_num(resume) + ".dat";
+        fname = PATH_OUT + "dustdens_" + frame_num(resume) + ".dat";
         save_binary(fname, dustdens, N_GRD);
 
         cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "optdepth_" + frame_num(resume) + ".dat";
+        fname = PATH_OUT + "optdepth_" + frame_num(resume) + ".dat";
         save_binary(fname, optdepth, N_GRD);
 
         cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".dat";
+        fname = PATH_OUT + "particle_" + frame_num(resume) + ".dat";
         save_binary(fname, particle, N_PAR);
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::cout << std::setw(3) << std::setfill('0') << 0 << "/" << std::setw(3) << std::setfill('0') << FILENUM_MAX << " finished on " << std::ctime(&end_time);
+        std::cout   << std::endl
+                    << std::setw(3) << std::setfill('0') << 0 << "/" 
+                    << std::setw(3) << std::setfill('0') << SAVE_MAX << " finished on " << std::ctime(&end_time)
+                    << std::endl;
     }
     else
     {
         std::stringstream convert{argv[1]};     // set up a stringstream variable named convert, initialized with the input from argv[1]
         if (!(convert >> resume)) resume = -1;  // do the conversion, if conversion fails, set resume to a default value
 
-        fname = PATH_FILESAVE + "particle_" + frame_num(resume) + ".dat";
+        fname = PATH_OUT + "particle_" + frame_num(resume) + ".dat";
         load_binary(fname, particle, N_PAR);
         cudaMemcpy(dev_particle, particle, sizeof(swarm)*N_PAR,  cudaMemcpyHostToDevice);
 
@@ -152,10 +155,15 @@ int main (int argc, char **argv)
         rngs_grd_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rngs_grd);
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::cout << std::setw(3) << std::setfill('0') << resume << "/" << std::setw(3) << std::setfill('0') << FILENUM_MAX << " finished on " << std::ctime(&end_time);
+        std::cout   << std::endl 
+                    << std::setfill('0')
+                    << std::setw(3) << resume << "/"
+                    << std::setw(3) << SAVE_MAX
+                    << " finished on " << std::ctime(&end_time)
+                    << std::endl;
     }
 
-    for (int idx_file = 1 + resume; idx_file <= FILENUM_MAX; idx_file++)    // main evolution loop
+    for (int idx_file = 1 + resume; idx_file <= SAVE_MAX; idx_file++)    // main evolution loop
     {
         timer_out = 0.0;
         
@@ -171,31 +179,37 @@ int main (int argc, char **argv)
             treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode);
             cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);
             
+            std::cout   << std::setfill(' ') 
+                        << std::setw(10) << "count_col" << " "
+                        << std::setw(10) << "dt_dyn"    << " "
+                        << std::setw(10) << "timer_out" << " "
+                        << std::setw(10) << "timer_sim" << std::endl;
+
             // Collision loop: evolve until timer_dyn reaches dt_dyn
-            while (timer_dyn < dt_dyn)
-            {
-                col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_real, dev_max_rate);
-                col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_rate, dev_boundbox);
-                col_rate_peak <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_max_rate);
+            // while (timer_dyn < dt_dyn)
+            // {
+            //     col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_real, dev_max_rate);
+            //     col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_rate, dev_boundbox);
+            //     col_rate_peak <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_max_rate);
                 
-                cudaMemcpy(max_rate, dev_max_rate, sizeof(float), cudaMemcpyDeviceToHost);
+            //     cudaMemcpy(max_rate, dev_max_rate, sizeof(float), cudaMemcpyDeviceToHost);
                 
-                // Compute collisional timestep
-                dt_col = 1.0 / static_cast<real>(*max_rate);
+            //     // Compute collisional timestep
+            //     dt_col = 1.0 / static_cast<real>(*max_rate);
                 
-                // Use minimum of all constraints
-                dt_col = fmin(dt_col, dt_dyn);
-                dt_col = fmin(dt_col, dt_dyn - timer_dyn);
+            //     // Use minimum of all constraints
+            //     dt_col = fmin(dt_col, dt_dyn);
+            //     dt_col = fmin(dt_col, dt_dyn - timer_dyn);
 
-                col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_flag, dev_rngs_grd, dt_col);
-                particle_evol <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_flag, dev_col_rand, 
-                                                               dev_col_real, dev_boundbox, dev_rngs_par);
+            //     col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_flag, dev_rngs_grd, dt_col);
+            //     particle_evol <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_flag, dev_col_rand, 
+            //                                                    dev_col_real, dev_boundbox, dev_rngs_par);
 
-                cudaDeviceSynchronize();
+            //     cudaDeviceSynchronize();
 
-                timer_dyn += dt_col;
-                count_col ++;
-            }
+            //     timer_dyn += dt_col;
+            //     count_col ++;
+            // }
 
             // Dynamics integration with dt_dyn timestep
             ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
@@ -204,14 +218,19 @@ int main (int argc, char **argv)
             optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
             optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
             ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
-            pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par, dt_dyn);
+            // pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par, dt_dyn);
 
             cudaDeviceSynchronize();
 
             timer_sim += dt_dyn;
             timer_out += dt_dyn;
 
-            std::cout << std::setprecision(6) << std::scientific << count_col << ' ' << dt_dyn << ' ' << timer_out << ' ' << timer_sim << std::endl;
+            std::cout   << std::setfill(' ')
+                        << std::setw(10) << count_col   << " " 
+                        << std::scientific << std::setprecision(3) 
+                        << std::setw(10) << dt_dyn      << " "
+                        << std::setw(10) << timer_out   << " "
+                        << std::setw(10) << timer_sim   << std::endl;
         }
     
         // calculate dustdens grids for each output
@@ -220,7 +239,7 @@ int main (int argc, char **argv)
         dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
 
         cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "dustdens_" + frame_num(idx_file) + ".dat";
+        fname = PATH_OUT + "dustdens_" + frame_num(idx_file) + ".dat";
         save_binary(fname, dustdens, N_GRD);
 
         // calculate optical depth grids for each output
@@ -230,18 +249,22 @@ int main (int argc, char **argv)
         optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
 
         cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_FILESAVE + "optdepth_" + frame_num(idx_file) + ".dat";
+        fname = PATH_OUT + "optdepth_" + frame_num(idx_file) + ".dat";
         save_binary(fname, optdepth, N_GRD);
 
-        if (idx_file % SWARM_EVERY == 0)
+        if (idx_file % SAVE_PAR == 0)
         {
             cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
-            fname = PATH_FILESAVE + "particle_" + frame_num(idx_file) + ".dat";
+            fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
             save_binary(fname, particle, N_PAR);
         }
 
         std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        std::cout << std::setw(3) << std::setfill('0') << idx_file << "/" << std::setw(3) << std::setfill('0') << FILENUM_MAX << " finished on " << std::ctime(&end_time);
+        std::cout   << std::endl << std::setfill('0') 
+                    << std::setw(3) << idx_file << "/" 
+                    << std::setw(3) << SAVE_MAX 
+                    << " finished on " << std::ctime(&end_time)
+                    << std::endl;
     }
  
     return 0;

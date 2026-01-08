@@ -84,8 +84,8 @@ void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_p
     
     // x_min and x_max define the hard boundary of the smoothed profile
     // p_min and p_max define the domain that is not too much smoothed
-    real p_min = x_min + smooth;
-    real p_max = x_max - smooth;
+    real p_min = x_min + 2.0*smooth;
+    real p_max = x_max - 2.0*smooth;
     
     // Build x-axis and compute convolved profile
     std::vector<real> x_axis(bins + 1);

@@ -114,7 +114,7 @@ bool save_variable (const std::string &file_name)
     
     file << "[PARAMETERS]" << std::endl;
     // file << "N_PAR = \t" << std::scientific << std::setprecision(15) 
-    //      << std::setw(24) << std::setfill(' ') << N_PAR << std::endl;
+    //      << std::setw(24) << std::setfill(" ") << N_PAR << std::endl;
     
     return file.good();
 }
