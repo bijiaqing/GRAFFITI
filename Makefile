@@ -1,6 +1,7 @@
-IDIR = ./include
-ODIR = ./object
-SDIR = ./source
+INC_DIR = ./inc
+OBJ_DIR = ./obj
+SRC_DIR = ./src
+OUT_DIR = ./out
 
 NVCC = nvcc
 # sm_80 is for A100 GPU
@@ -14,11 +15,11 @@ NVCC += --diag-suppress 177,550
 
 EXEC = cuDust
 
-_DEP = const.cuh cudust.cuh
-DEP = $(patsubst %, $(IDIR)/%, $(_DEP))
+_INC = const.cuh cudust.cuh
+INC = $(patsubst %, $(INC_DIR)/%, $(_INC))
 
 _OBJ = collision.o initialize.o integrator.o interpolate.o main.o mesh.o profiles.o 
-OBJ = $(patsubst %, $(ODIR)/%, $(_OBJ))
+OBJ = $(patsubst %, $(OBJ_DIR)/%, $(_OBJ))
 
 .PHONY: all clean cleanall
 
@@ -28,18 +29,20 @@ $(EXEC): $(OBJ)
 	@printf "%-12s %-25s %s\n" "Linking" "$@" "from $(words $(OBJ)) objects"
 	@$(NVCC) -o $@ $^
 
-$(ODIR)/%.o: $(SDIR)/%.cu $(DEP) | $(ODIR)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu $(DEP) | $(OBJ_DIR)
 	@printf "%-12s %-25s -> %s\n" "Compiling" "$<" "$@"
-	@$(NVCC) --device-c -o $@ $< -I $(IDIR)
+	@$(NVCC) --device-c -o $@ $< -I $(INC_DIR)
 
-$(ODIR):
+$(OBJ_DIR):
 	@printf "%-12s %s\n" "Creating" "$@"
-	@mkdir -p $(ODIR)
+	@mkdir -p $(OBJ_DIR)
 
 clean:
-	@printf "%-12s %s\n" "Cleaning" "$(EXEC) and object files"
-	@rm -f $(EXEC) $(OBJ)
+	@printf "%-12s %s\n" "Cleaning" "$(EXEC)"
+	@rm -f $(EXEC)
+	@printf "%-12s %s\n" "Cleaning" "object files"
+	@rm -f $(OBJ_DIR)/*
 
 cleanall: clean
-	@printf "%-12s %s\n" "Removing" "outputs directory"
-	@rm -rf outputs/
+	@printf "%-12s %s\n" "Cleaning" "output files"
+	@rm -rf $(OUT_DIR)/*
