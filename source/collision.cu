@@ -127,7 +127,7 @@ void col_rate_peak (real *dev_col_rate, float *dev_max_rate)
 // =========================================================================================================================
 
 __global__
-void col_flag_calc (real *dev_col_rate, real *dev_col_rand, int *dev_col_flag, real *dev_timestep, curandState *dev_rngs_grd)
+void col_flag_calc (real *dev_col_rate, real *dev_col_rand, int *dev_col_flag, curandState *dev_rngs_grd, real dt_col)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
@@ -137,7 +137,7 @@ void col_flag_calc (real *dev_col_rate, real *dev_col_rand, int *dev_col_flag, r
         
         // if real > rand, there will be a collision in the cell in the current timestep
         real col_rand = curand_uniform_double(&rngs_grd); // the range is (0,1]
-        real col_real = (*dev_timestep)*dev_col_rate[idx];
+        real col_real = dt_col*dev_col_rate[idx];
 
         if (col_real >= col_rand)
         {

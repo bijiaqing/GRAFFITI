@@ -81,11 +81,11 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const int  FILENUM_MAX = 10;               // total number of outputs for mesh fields
+const int  FILENUM_MAX = 10;                // total number of outputs for mesh fields
 const int  SWARM_EVERY = 1;                 // save particle data every X mesh outputs
 
-const real DT_FILESAVE = 0.2*M_PI;          // time interval between adjascent outputs
-const real DT_DYNAMICS = 2.0*M_PI/static_cast<real>(N_X);
+const real DT_OUT = 0.2*M_PI;               // time interval between adjascent outputs
+const real DT_DYN = 2.0*M_PI/static_cast<real>(N_X);
 
 const std::string PATH_FILESAVE = "outputs/";
 

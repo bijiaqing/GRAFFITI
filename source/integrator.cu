@@ -3,13 +3,12 @@
 // =========================================================================================================================
 
 __global__ 
-void ssa_substep_1 (swarm *dev_particle)
+void ssa_substep_1 (swarm *dev_particle, real dt)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
     if (idx < N_PAR)
     {
-        real dt = DT_DYNAMICS;
 
         real x_i  = dev_particle[idx].position.x;
         real y_i  = dev_particle[idx].position.y;
@@ -70,13 +69,12 @@ void ssa_substep_1 (swarm *dev_particle)
 // =========================================================================================================================
 
 __global__
-void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth)
+void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth, real dt)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
     if (idx < N_PAR)
     {
-        real dt = DT_DYNAMICS;
 
         real x_1  = dev_particle[idx].position.x;
         real y_1  = dev_particle[idx].position.y;
@@ -201,13 +199,12 @@ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth)
 // =========================================================================================================================
 
 __global__
-void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par)
+void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par, real dt)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
     if (idx < N_PAR)
     {
-        real dt = DT_DYNAMICS;
         
         real y = dev_particle[idx].position.y;
         real z = dev_particle[idx].position.z;

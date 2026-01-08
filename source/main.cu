@@ -13,10 +13,13 @@ std::mt19937 rand_generator;
 int main (int argc, char **argv)
 {
     int resume;
+    int count_col; // how many collision calculations in one dynamics timestep
     
-    real timer = 0.0;
-    real dynamics_timer = 0.0;
-    real filesave_timer = 0.0;
+    real timer_sim = 0.0;
+    real timer_dyn = 0.0;
+    real timer_out = 0.0;
+    
+    real dt_dyn, dt_col;
     
     std::string fname;
     std::uniform_real_distribution <real> random(0.0, 1.0); // distribution in [0, 1)
@@ -49,10 +52,6 @@ int main (int argc, char **argv)
     float *max_rate, *dev_max_rate;
     cudaMallocHost((void**)&max_rate, sizeof(float));
     cudaMalloc((void**)&dev_max_rate, sizeof(float));
-
-    real *timestep, *dev_timestep;
-    cudaMallocHost((void**)&timestep, sizeof(real));
-    cudaMalloc((void**)&dev_timestep, sizeof(real));
 
     boxf *dev_boundbox;
     cudaMalloc((void**)&dev_boundbox, sizeof(boxf));
@@ -113,8 +112,8 @@ int main (int argc, char **argv)
         dustdens_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
         dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // of each particle may differ
         
-        // rngs_par_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rngs_par);
-        // rngs_grd_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rngs_grd);
+        rngs_par_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rngs_par);
+        rngs_grd_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rngs_grd);
 
         mkdir(PATH_FILESAVE.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
@@ -158,56 +157,62 @@ int main (int argc, char **argv)
 
     for (int idx_file = 1 + resume; idx_file <= FILENUM_MAX; idx_file++)    // main evolution loop
     {
-        while (filesave_timer < DT_FILESAVE)                                // evolve particle dynamics until one output timestep
+        timer_out = 0.0;
+        
+        while (timer_out < DT_OUT)                                          // evolve particle until one output timestep
         {
-            // treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode);
-            // cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);    // takes 250 ms!!
+            timer_dyn = 0.0;
+            count_col = 0;
             
-            // while (dynamics_timer < DT_DYNAMICS)                            // evolve grain collision until one dynamical timestep
-            // {
-            //     col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_real, dev_max_rate);
-            //     col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_rate, dev_boundbox);
-            //     col_rate_peak <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_max_rate);
+            // Compute dynamics timestep: min of DT_DYN and remaining time to file save
+            dt_dyn = fmin(DT_DYN, DT_OUT - timer_out);
+            
+            // Update tree for collision calculations
+            treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode);
+            cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);
+            
+            // Collision loop: evolve until timer_dyn reaches dt_dyn
+            while (timer_dyn < dt_dyn)
+            {
+                col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_real, dev_max_rate);
+                col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_rate, dev_boundbox);
+                col_rate_peak <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_max_rate);
                 
-            //     cudaMemcpy(max_rate, dev_max_rate, sizeof(float), cudaMemcpyDeviceToHost);
+                cudaMemcpy(max_rate, dev_max_rate, sizeof(float), cudaMemcpyDeviceToHost);
                 
-            //     *timestep = 1.0 / static_cast<real>(*max_rate);
+                // Compute collisional timestep
+                dt_col = 1.0 / static_cast<real>(*max_rate);
                 
-            //     if (*timestep > DT_DYNAMICS)                  *timestep = DT_DYNAMICS;
-            //     if (*timestep > DT_DYNAMICS - dynamics_timer) *timestep = DT_DYNAMICS - dynamics_timer;
-            //     if (*timestep > DT_FILESAVE - filesave_timer) *timestep = DT_FILESAVE - filesave_timer;
+                // Use minimum of all constraints
+                dt_col = fmin(dt_col, dt_dyn);
+                dt_col = fmin(dt_col, dt_dyn - timer_dyn);
 
-            //     cudaMemcpy(dev_timestep, timestep, sizeof(real), cudaMemcpyHostToDevice);
+                col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_flag, dev_rngs_grd, dt_col);
+                particle_evol <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_flag, dev_col_rand, 
+                                                               dev_col_real, dev_boundbox, dev_rngs_par);
 
-            //     col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_rand, dev_col_flag, dev_timestep, dev_rngs_grd);
-            //     particle_evol <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode, dev_col_flag, dev_col_rand, dev_col_real, dev_boundbox, dev_rngs_par);
+                cudaDeviceSynchronize();
 
-            //     cudaDeviceSynchronize();  // Ensure collisions are processed before next iteration
+                timer_dyn += dt_col;
+                count_col ++;
+            }
 
-            //     timer          += *timestep;
-            //     dynamics_timer += *timestep;
-            //     filesave_timer += *timestep;
-            // }
-
-            timer          += DT_DYNAMICS;  // for testing without collisions
-            filesave_timer += DT_DYNAMICS;  // for testing without collisions
-
-            dynamics_timer = 0.0;
-
-            ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle);
+            // Dynamics integration with dt_dyn timestep
+            ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
             optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
             optdepth_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
             optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
             optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
-            ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth);
-            // pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par);
+            ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
+            pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par, dt_dyn);
 
-            cudaDeviceSynchronize();  // Ensure positions updated before next iteration
+            cudaDeviceSynchronize();
 
-            std::cout << std::setprecision(6) << std::scientific << *timestep << ' ' << filesave_timer << ' ' << timer << std::endl;
+            timer_sim += dt_dyn;
+            timer_out += dt_dyn;
+
+            std::cout << std::setprecision(6) << std::scientific << count_col << ' ' << dt_dyn << ' ' << timer_out << ' ' << timer_sim << std::endl;
         }
-    
-        filesave_timer = 0.0;
     
         // calculate dustdens grids for each output
         dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);

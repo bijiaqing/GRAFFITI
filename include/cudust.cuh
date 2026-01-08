@@ -37,15 +37,15 @@ __global__ void rngs_grd_init (curandState *dev_rngs_grd, int seed = 1);
 __global__ void col_rate_init (real  *dev_col_rate, real  *dev_col_rand, real *dev_col_real, float *dev_max_rate);
 __global__ void col_rate_calc (swarm *dev_particle, tree  *dev_treenode, real *dev_col_rate, boxf  *dev_boundbox);
 __global__ void col_rate_peak (real  *dev_col_rate, float *dev_max_rate);
-__global__ void col_flag_calc (real  *dev_col_rate, real  *dev_col_rand, int  *dev_col_flag, real  *dev_timestep, curandState *dev_rngs_grd);
+__global__ void col_flag_calc (real  *dev_col_rate, real  *dev_col_rand, int  *dev_col_flag, curandState *dev_rngs_grd, real dt_col);
 __global__ void particle_evol (swarm *dev_particle, tree  *dev_treenode, int  *dev_col_flag, real  *dev_col_rand, real *dev_col_real, boxf *dev_boundbox, curandState *dev_rngs_par);
 
 // =========================================================================================================================
 // integrator
 
-__global__ void ssa_substep_1 (swarm *dev_particle);
-__global__ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth);
-__global__ void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par);
+__global__ void ssa_substep_1 (swarm *dev_particle, real dt);
+__global__ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth, real dt);
+__global__ void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par, real dt);
 
 // =========================================================================================================================
 // interpolation
