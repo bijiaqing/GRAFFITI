@@ -35,6 +35,10 @@ const real  ST_0        = 1.0e-04;          // the reference Stokes number of th
 const real  BETA_0      = 1.0e+01;          // the reference ratio between the radiation pressure and the gravity
 const real  KAPPA_0     = 3.0e-28;          // the reference gray opacity of the dust
 
+// set Schmidt numbers to 1.0e+10 to disable diffusion
+const real  SCHMIDT_R   = 1.0e+10;          // the Schmidt number for radial   diffusion
+const real  SCHMIDT_Z   = 1.0;              // the Schmidt number for vertical diffusion
+
 // =========================================================================================================================
 // dust parameters for coagulation
 
@@ -43,25 +47,25 @@ const real  RHO_0       = 1.0;              // the reference internal density of
 const real  LAMBDA_0    = 1.0e-20;          // the reference collision rate of the dust
 const real  V_FRAG      = 1.0e-04;          // the fragmentation velocity for dust collision
 
-const int   KNN_SIZE = 100;                 // the maximum number   for neighbor search 
-const float MAX_DIST = 0.05;                // the maximum distance for neighbor search
+const int   KNN_SIZE    = 100;              // the maximum number   for neighbor search 
+const float MAX_DIST    = 0.05;             // the maximum distance for neighbor search
 
 // =========================================================================================================================
 // mesh domain size and resolution
 
 const int   N_PAR       = 1e+06;            // total number of super-particles in the model
 
-const int   N_X         = 300;              // number of grid cells in X direction (azimuth)
-const real  X_MIN       = -M_PI;            // minimum X boundary (azimuth)
+const int   N_X         = 1;                // number of grid cells in X direction (azimuth)
+const real  X_MIN       = +M_PI;            // minimum X boundary (azimuth)
 const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 
-const int   N_Y         = 300;              // number of grid cells in Y direction (radius)
+const int   N_Y         = 100;             // number of grid cells in Y direction (radius)
 const real  Y_MIN       = 1.0;              // minimum Y boundary (radius)
 const real  Y_MAX       = 3.0;              // maximum Y boundary (radius)
 
-const int   N_Z         = 1;                // number of grid cells in Z direction (colattitude)
-const real  Z_MIN       = 0.5*M_PI;         // minimum Z boundary (colattitude)
-const real  Z_MAX       = 0.5*M_PI;         // maximum Z boundary (colattitude)
+const int   N_Z         = 100;                // number of grid cells in Z direction (colattitude)
+const real  Z_MIN       = 0.5*M_PI - 0.2;         // minimum Z boundary (colattitude)
+const real  Z_MAX       = 0.5*M_PI + 0.2;         // maximum Z boundary (colattitude)
 
 // =========================================================================================================================
 // dust initialization parameters
@@ -72,8 +76,8 @@ const real INIT_XMAX    = X_MAX;            // maximum X boundary for particle i
 const real INIT_YMIN    = Y_MIN;            // minimum Y boundary for particle initialization
 const real INIT_YMAX    = Y_MAX;            // maximum Y boundary for particle initialization
 
-const real INIT_ZMIN    = Z_MIN;            // minimum Z boundary for particle initialization
-const real INIT_ZMAX    = Z_MAX;            // maximum Z boundary for particle initialization
+const real INIT_ZMIN    = 0.5*M_PI;            // minimum Z boundary for particle initialization
+const real INIT_ZMAX    = 0.5*M_PI;            // maximum Z boundary for particle initialization
 
 const real INIT_SMIN    = 1.0e+00;          // minimum grain size for particle initialization
 const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle initialization
@@ -81,8 +85,8 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const int  SAVE_MAX = 100;                   // total number of outputs for mesh fields
-const int  SAVE_PAR = 10;                   // save particle data every X mesh outputs
+const int  SAVE_MAX     = 100;              // total number of outputs for mesh fields
+const int  SAVE_PAR     = 10;               // save particle data every X mesh outputs
 
 const real DT_OUT = 2.0*M_PI;               // time interval between adjascent outputs
 const real DT_DYN = 2.0*M_PI/static_cast<real>(N_X);

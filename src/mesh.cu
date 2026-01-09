@@ -82,7 +82,7 @@ void optdepth_enum (real *dev_optdepth, swarm *dev_particle)
 
     if (idx < N_PAR)
     {
-        _particle_to_grid_core<OPTDEPTH>(dev_optdepth, dev_particle, idx);
+        _particle_to_grid_core <OPTDEPTH> (dev_optdepth, dev_particle, idx);
     }
 }
 
@@ -93,7 +93,7 @@ void dustdens_enum (real *dev_dustdens, swarm *dev_particle)
 
     if (idx < N_PAR)
     {
-        _particle_to_grid_core<DUSTDENS>(dev_dustdens, dev_particle, idx);
+        _particle_to_grid_core <DUSTDENS> (dev_dustdens, dev_particle, idx);
     }
 }
 

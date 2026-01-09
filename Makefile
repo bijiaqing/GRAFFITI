@@ -18,7 +18,7 @@ EXEC = cuDust
 _INC = const.cuh cudust.cuh
 INC = $(patsubst %, $(INC_DIR)/%, $(_INC))
 
-_OBJ = collision.o initialize.o integrator.o interpolate.o main.o mesh.o profiles.o 
+_OBJ = collision.o diffusion.o initialize.o integrator.o interpolate.o main.o mesh.o profiles.o 
 OBJ = $(patsubst %, $(OBJ_DIR)/%, $(_OBJ))
 
 .PHONY: all clean cleanall

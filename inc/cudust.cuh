@@ -39,18 +39,21 @@ __global__ void col_flag_calc (real  *dev_col_rate, real  *dev_col_rand, int  *d
 __global__ void particle_evol (swarm *dev_particle, tree  *dev_treenode, int  *dev_col_flag, real  *dev_col_rand, real *dev_col_real, boxf *dev_boundbox, curandState *dev_rngs_par);
 
 // =========================================================================================================================
-// integrator
+// ssa integrator
 
 __global__ void ssa_substep_1 (swarm *dev_particle, real dt);
 __global__ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth, real dt);
+
+// =========================================================================================================================
+// diffusion related
+
 __global__ void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par, real dt);
 
 // =========================================================================================================================
 // interpolation
 
 __device__ interp _linear_interp_cent (real loc_x, real loc_y, real loc_z);
-
-__device__ real _get_optdepth (real *dev_optdepth, real loc_x, real loc_y, real loc_z);
+__device__ real   _get_optdepth (real *dev_optdepth, real loc_x, real loc_y, real loc_z);
 
 // =========================================================================================================================
 // profile generators

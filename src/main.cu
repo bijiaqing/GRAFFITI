@@ -214,13 +214,13 @@ int main (int argc, char **argv)
             // }
 
             // Dynamics integration with dt_dyn timestep
-            ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
-            optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-            optdepth_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
-            optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-            optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
-            ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
-            // pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par, dt_dyn);
+            // ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
+            // optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+            // optdepth_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
+            // optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+            // optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
+            // ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
+            pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rngs_par, dt_dyn);
 
             cudaDeviceSynchronize();
 
