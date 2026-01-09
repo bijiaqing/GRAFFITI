@@ -24,8 +24,6 @@ __global__ void dustdens_calc (real *dev_dustdens);
 // initialization 
 
 __global__ void particle_init (swarm *dev_particle, real *dev_random_x, real *dev_random_y, real *dev_random_z, real *dev_random_s);
-__global__ void velocity_init (swarm *dev_particle);
-__global__ void velocity_init (swarm *dev_particle, real *dev_optdepth);
 __global__ void treenode_init (swarm *dev_particle, tree *dev_treenode);
 
 __global__ void rngs_par_init (curandState *dev_rngs_par, int seed = 0);

@@ -14,6 +14,7 @@ int main (int argc, char **argv)
 {
     int resume;
     int count_col; // how many collision calculations in one dynamics timestep
+    int count_dyn; // how many dynamics timesteps in one output timestep
     
     real timer_sim = 0.0;
     real timer_dyn = 0.0;
@@ -105,8 +106,6 @@ int main (int argc, char **argv)
         optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);                   // calculate the optical thickness of each cell
         optdepth_intg <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);                   // integrate in Y direction to get optical depth
         optdepth_mean <<< NB_X, THREADS_PER_BLOCK >>> (dev_optdepth);                   // do azimuthal averaging for initial condition
-
-        velocity_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth);     // initialize particle velocity after optical depth calculation
         
         dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // this process cannot be merged with the above
         dustdens_enum <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
@@ -166,6 +165,7 @@ int main (int argc, char **argv)
     for (int idx_file = 1 + resume; idx_file <= SAVE_MAX; idx_file++)    // main evolution loop
     {
         timer_out = 0.0;
+        count_dyn = 0;
         
         while (timer_out < DT_OUT)                                          // evolve particle until one output timestep
         {
@@ -176,11 +176,13 @@ int main (int argc, char **argv)
             dt_dyn = fmin(DT_DYN, DT_OUT - timer_out);
             
             // Update tree for collision calculations
-            treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode);
-            cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);
+            // treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_treenode);
+            // cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);
             
-            std::cout   << std::setfill(' ') 
+            std::cout   << std::setfill(' ')
+                        << std::setw(10) << "idx_file"  << " "
                         << std::setw(10) << "count_col" << " "
+                        << std::setw(10) << "count_dyn" << " "
                         << std::setw(10) << "dt_dyn"    << " "
                         << std::setw(10) << "timer_out" << " "
                         << std::setw(10) << "timer_sim" << std::endl;
@@ -225,8 +227,12 @@ int main (int argc, char **argv)
             timer_sim += dt_dyn;
             timer_out += dt_dyn;
 
+            count_dyn ++;
+
             std::cout   << std::setfill(' ')
+                        << std::setw(10) << idx_file    << " "
                         << std::setw(10) << count_col   << " " 
+                        << std::setw(10) << count_dyn   << " "
                         << std::scientific << std::setprecision(3) 
                         << std::setw(10) << dt_dyn      << " "
                         << std::setw(10) << timer_out   << " "

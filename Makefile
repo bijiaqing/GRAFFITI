@@ -29,7 +29,7 @@ $(EXEC): $(OBJ)
 	@printf "%-12s %-25s %s\n" "Linking" "$@" "from $(words $(OBJ)) objects"
 	@$(NVCC) -o $@ $^
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu $(DEP) | $(OBJ_DIR)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu $(INC) | $(OBJ_DIR)
 	@printf "%-12s %-25s -> %s\n" "Compiling" "$<" "$@"
 	@$(NVCC) --device-c -o $@ $< -I $(INC_DIR)
 
@@ -41,7 +41,7 @@ clean:
 	@printf "%-12s %s\n" "Cleaning" "$(EXEC)"
 	@rm -f $(EXEC)
 	@printf "%-12s %s\n" "Cleaning" "object files"
-	@rm -f $(OBJ_DIR)/*
+	@rm -rf $(OBJ_DIR)/*
 
 cleanall: clean
 	@printf "%-12s %s\n" "Cleaning" "output files"

@@ -9,7 +9,6 @@ void ssa_substep_1 (swarm *dev_particle, real dt)
 
     if (idx < N_PAR)
     {
-
         real x_i  = dev_particle[idx].position.x;
         real y_i  = dev_particle[idx].position.y;
         real z_i  = dev_particle[idx].position.z;
@@ -75,7 +74,6 @@ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth, real dt)
 
     if (idx < N_PAR)
     {
-
         real x_1  = dev_particle[idx].position.x;
         real y_1  = dev_particle[idx].position.y;
         real z_1  = dev_particle[idx].position.z;
@@ -102,9 +100,9 @@ void ssa_substep_2 (swarm *dev_particle, real *dev_optdepth, real dt)
 
         // calculate the stopping time and the dimensionless time
         real ts_1;
-        ts_1  = ST_0*(s / S_0) / sqrt(G*M_S / R_0 / R_0 / R_0); // for reference size grain at the reference radius
-        ts_1 *= pow(bigR_1, -IDX_SURF + 1.5);                   // correct for radial gas density and sound speed
-        ts_1 *= exp(-bigZ_1*bigZ_1 / (2.0*h_sqr*bigR_1*bigR_1));   // correct for vertical gas density
+        ts_1  = ST_0*(s / S_0) / sqrt(G*M_S / R_0 / R_0 / R_0);     // for reference size grain at the reference radius
+        ts_1 *= pow(bigR_1, -IDX_SURF + 1.5);                       // correct for radial gas density and sound speed
+        ts_1 *= exp(-bigZ_1*bigZ_1 / (2.0*h_sqr*bigR_1*bigR_1));    // correct for vertical gas density
         
         real tau_1 = dt / ts_1;
 
@@ -205,7 +203,6 @@ void pos_diffusion (swarm *dev_particle, curandState *dev_rngs_par, real dt)
 
     if (idx < N_PAR)
     {
-        
         real y = dev_particle[idx].position.y;
         real z = dev_particle[idx].position.z;
 

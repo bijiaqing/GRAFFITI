@@ -44,19 +44,10 @@ void _particle_to_grid_core(real *dev_grid, swarm *dev_particle, int idx)
         return; // particle is out of the grid, do nothing
     }
 
-    interp result = _linear_interp_cent(loc_x, loc_y, loc_z);
-
-    int  next_x = result.next_x;
-    int  next_y = result.next_y;
-    int  next_z = result.next_z;
-    real frac_x = result.frac_x;
-    real frac_y = result.frac_y;
-    real frac_z = result.frac_z;
-
     int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+    auto [next_x, next_y, next_z, frac_x, frac_y, frac_z] = _linear_interp_cent(loc_x, loc_y, loc_z);
 
-    real par_size = dev_particle[idx].par_size;
-    
+    real par_size = dev_particle[idx].par_size;    
     real weight = 0.0;
 
     if (field_type == OPTDEPTH)
@@ -119,9 +110,9 @@ void _grid_indices (int idx, int &idx_x, int &idx_y, int &idx_z)
 __device__
 void _grid_volume (int idx_y, int idx_z, real &vol_x, real &vol_y, real &vol_z)
 {
-    real dx = (X_MAX - X_MIN) / static_cast<real>(N_X);
+    real dx = (X_MAX - X_MIN)        / static_cast<real>(N_X);
     real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
-    real dz = (Z_MAX - Z_MIN) / static_cast<real>(N_Z);
+    real dz = (Z_MAX - Z_MIN)        / static_cast<real>(N_Z);
 
     bool has_x = (N_X > 1);
     bool has_z = (N_Z > 1);

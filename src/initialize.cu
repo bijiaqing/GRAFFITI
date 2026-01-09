@@ -49,59 +49,17 @@ void particle_init (swarm *dev_particle, real *dev_random_x, real *dev_random_y,
 
     if (idx < N_PAR)
     {
-        real s = dev_random_s[idx];
-
         dev_particle[idx].position.x = dev_random_x[idx];
         dev_particle[idx].position.y = dev_random_y[idx];
         dev_particle[idx].position.z = dev_random_z[idx];
-        
-        dev_particle[idx].par_size   = s;
-        dev_particle[idx].par_numr   = _compute_grain_number(s);
+
+        dev_particle[idx].velocity.x = sqrt(G*M_S*dev_random_y[idx]); // specific angular momentum in azimuth
+        dev_particle[idx].velocity.y = 0.0;
+        dev_particle[idx].velocity.z = 0.0;
+
+        dev_particle[idx].par_size   = dev_random_s[idx];
+        dev_particle[idx].par_numr   = _compute_grain_number(dev_random_s[idx]);
         dev_particle[idx].col_rate   = 0.0;
-    }
-}
-
-// =========================================================================================================================
-
-__global__ 
-void velocity_init (swarm *dev_particle)
-{
-    int idx = threadIdx.x+blockDim.x*blockIdx.x;
-
-    if (idx < N_PAR)
-    {
-        real y = dev_particle[idx].position.y;
-        
-        dev_particle[idx].velocity.x = sqrt(G*M_S*y);
-        dev_particle[idx].velocity.y = 0.0;
-        dev_particle[idx].velocity.z = 0.0;
-    }
-}
-
-// =========================================================================================================================
-
-__global__ 
-void velocity_init (swarm *dev_particle, real *dev_optdepth)
-{
-    int idx = threadIdx.x+blockDim.x*blockIdx.x;
-
-    if (idx < N_PAR)
-    {
-        real x = dev_particle[idx].position.x;
-        real y = dev_particle[idx].position.y;
-        real z = dev_particle[idx].position.z;
-        real s = dev_particle[idx].par_size;
-
-        real loc_x = (N_X > 1) ? (static_cast<real>(N_X)*   (x - X_MIN) /    (X_MAX - X_MIN)) : 0.0;
-        real loc_y = (N_Y > 1) ? (static_cast<real>(N_Y)*log(y / Y_MIN) / log(Y_MAX / Y_MIN)) : 0.0;
-        real loc_z = (N_Z > 1) ? (static_cast<real>(N_Z)*   (z - Z_MIN) /    (Z_MAX - Z_MIN)) : 0.0;
-
-        real tau = _get_optdepth(dev_optdepth, loc_x, loc_y, loc_z);
-        real beta = BETA_0*exp(-tau) / (s / S_0);
-        
-        dev_particle[idx].velocity.x = sqrt(G*M_S*y)*sqrt(1.0 - beta);
-        dev_particle[idx].velocity.y = 0.0;
-        dev_particle[idx].velocity.z = 0.0;
     }
 }
 
