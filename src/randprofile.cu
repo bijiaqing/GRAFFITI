@@ -1,3 +1,4 @@
+#include <algorithm>        // for std::max_element
 #include "cudust.cuh"
 
 // =========================================================================================================================
@@ -16,9 +17,9 @@ void rand_uniform (real *profile, int number, real p_min, real p_max)
 // =========================================================================================================================
 
 __host__
-void rand_gaussian (real *profile, int number, real p_min, real p_max, real p_0, real sigma)
+void rand_gaussian (real *profile, int number, real p_min, real p_max, real mu, real std)
 {
-    std::normal_distribution <real> random(p_0, sigma);
+    std::normal_distribution <real> random(mu, std);
 
     for (int i = 0; i < number; i++)
     {
@@ -54,13 +55,13 @@ void rand_pow_law (real *profile, int number, real p_min, real p_max, real idx_p
 
 // =========================================================================================================================
 
-__host__
+__host__ static
 real gaussian (real x, real x_0, real sigma)
 {
     return std::exp(-(x - x_0)*(x - x_0)/(2.0*sigma*sigma));
 }
 
-__host__
+__host__ static
 real tapered_pow (real x, real x_min, real x_max, real idx_pow)
 {
     real output;

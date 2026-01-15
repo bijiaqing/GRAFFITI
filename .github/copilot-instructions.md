@@ -10,9 +10,9 @@ This file provides focused, repo-specific guidance to AI coding agents working o
 **Key files & examples**
 - `include/const.cuh`: single place for simulation constants and structures (e.g. `N_PAR`, `N_X/N_Y/N_Z`, `THREADS_PER_BLOCK`, `PATH_FILESAVE`). Change problem size or resolution here.
 - `include/cudust.cuh`: kernel declarations and host helpers (frame naming, file IO, random profiles).
-- `source/main.cu`: program entrypoint and main evolution loop; shows orchestration of: tree build, `col_rate_calc`, `particle_evol`, `ssa_substep_*`, grid updates and file saves.
+- `source/main.cu`: program entrypoint and main evolution loop; shows orchestration of: tree build, `col_rate_calc`, `run_collision`, `ssa_substep_*`, grid updates and file saves.
 - `source/mesh.cu`: grid-related kernels (e.g., `optdepth_init`, `optdepth_calc`).
-- `source/collision.cu`: collision rate computation and collision-handling kernels (`col_rate_calc`, `particle_evol`).
+- `source/collision.cu`: collision rate computation and collision-handling kernels (`col_rate_calc`, `run_collision`).
 - `include/cukd/*`: KD-tree builders; choose builder variant via the `CUKD_BUILDER_*` defines in `cukd/builder.h` (thrust/bitonic/inplace) — significant perf/memory tradeoffs.
 
 **Build & run (practical commands)**
@@ -25,7 +25,7 @@ This file provides focused, repo-specific guidance to AI coding agents working o
 - Declarations vs implementations: declare kernels and host helpers in `include/cudust.cuh`; implement them in `source/*.cu`. Keep that separation.
 - Host/device memory pattern: code uses `cudaMallocHost` for pinned host buffers and `cudaMalloc` for device buffers (see `main.cu`); follow these allocations for performance-critical host-device transfers.
 - Grid indexing: grid cell indices computed from particle positions (see `collision.cu` and `integrator.cu`); treat `N_X/N_Y/N_Z` and `NG_XY` constants carefully when modifying resolution.
-- RNGs: uses both host `std::mt19937` (for initialization) and `curand` device RNGs (`curandState`) for per-thread randomness; do not mix semantics — look at `rngs_par_init` and `rngs_grd_init` in `initialize.cu`.
+- RNGs: uses both host `std::mt19937` (for initialization) and `curand` device RNGs (`curandState`) for per-thread randomness; do not mix semantics — look at `rs_swarm_init` and `rs_grids_init` in `initialize.cu`.
 
 **Performance & safety notes**
 - Default `N_PAR = 1e7` (in `include/const.cuh`) is huge. For local dev rely on a small test size (reduce `N_PAR`, `N_Y`) before running on a cluster/GPU with large memory.
