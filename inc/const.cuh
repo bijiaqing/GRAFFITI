@@ -1,9 +1,6 @@
 #ifndef CONST_CUH
 #define CONST_CUH
 
-// Compile-time feature flags (RADIATION, DIFFUSION, COLLISION)
-// are set via Makefile. See Makefile for enabling/disabling features.
-
 #include <cmath>                            // for M_PI
 #include <string>                           // for std::string
 
@@ -20,11 +17,16 @@ using real3 = double3;                      // double3 is a built-in CUDA type
 
 const real  G           = 1.0;              // gravitational constant
 const real  M_S         = 1.0;              // mass of the central star
-const real  R_0         = 1.0;              // reference radius
+const real  R_0         = 1.0;              // reference radius of the disk
 const real  S_0         = 1.0;              // the reference grain size of the dust, decoupled from R_0 for flexibility
 
 // =========================================================================================================================
 // gas paramters
+
+const real  SIGMA_0     = 1.0e-02;          // the reference gas surface density at R_0, used for dust dynamics and collision rate calculation
+const real  ASPR_0      = 0.05;             // the reference aspect ratio of the gas disk
+const real  IDX_P       = -1.0;             // the radial power-law index of the gas surface density profile
+const real  IDX_Q       = -0.4;             // the radial power-law index of the gas temperature profile (vertically isothermal)
 
 #ifndef CONST_NU
 const real  ALPHA       = 1.0e-4;           // the Shakura-Sunayev viscosity parameter of the gas
@@ -32,9 +34,12 @@ const real  ALPHA       = 1.0e-4;           // the Shakura-Sunayev viscosity par
 const real  NU          = 1.0e-6;           // the kinematic viscosity parameter of the gas
 #endif // CONST_NU
 
-const real  ASPR_0      = 0.05;             // the reference aspect ratio of the gas disk
-const real  IDX_P       = -1.0;             // the radial power-law index of the gas surface density profile
-const real  IDX_Q       = -0.4;             // the radial power-law index of the gas temperature profile (vertically isothermal)
+#ifndef CODE_UNIT
+const real  M_MOL       = 2.3*1.66054e-24;  // mean molecular weight of the gas in grams
+const real  X_SEC       = 2.0e-15;          // the cross section of H2 gas in cm^2
+#else
+const real  RE_0        = 1.0e+08;          // reference Reynolds number at R_0
+#endif // CODE_UNIT
 
 // =========================================================================================================================
 // dust parameters for dynamics
@@ -50,15 +55,15 @@ const real  KAPPA_0     = 3.0e-28;          // the reference gray opacity of the
 #endif // RADIATION
 
 #ifdef DIFFUSION
-const real  SCHMIDT_R   = 1.0e+10;          // the Schmidt number for radial   diffusion
-const real  SCHMIDT_Z   = 1.0;              // the Schmidt number for vertical diffusion
+const real  SC_R        = 1.0e+10;          // the Schmidt number for radial   diffusion
+const real  SC_Z        = 1.0;              // the Schmidt number for vertical diffusion
 #endif // DIFFUSION
 
 #ifdef COLLISION
 const real  LAMBDA_0    = 1.0e-20;          // the reference collision rate of the dust
 const real  V_FRAG      = 1.0e-04;          // the fragmentation velocity for dust collision
 
-const int   COL_KERNEL  = 0;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product
+const int   K_COAG  = 0;                    // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
 
 const int   KNN_SIZE    = 100;              // the maximum number   for neighbor search 
 const float MAX_DIST    = 0.05;             // the maximum distance for neighbor search

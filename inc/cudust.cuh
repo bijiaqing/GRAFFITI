@@ -52,6 +52,8 @@ __global__ void col_flag_calc (int *dev_col_flag, curs *dev_rs_grids, real *dev_
 
 __global__ void run_collision (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt, const real *dev_col_rand, 
     const int *dev_col_flag, const tree *dev_treenode, const bbox *dev_boundbox);
+
+__device__ real _get_grid_volume (int idx, real *y0_ptr = nullptr, real *dy_ptr = nullptr); // defined in gridfields.cu
 #endif // COLLISION
 
 // =========================================================================================================================
@@ -89,8 +91,18 @@ __device__ __forceinline__ real _get_loc_z (real z)
     return (N_Z > 1) ? (static_cast<real>(N_Z)*   (z - Z_MIN) /    (Z_MAX - Z_MIN)) : 0.0; 
 }
 
+// Shared device helpers (defined in helperfunc.cu)
+
+__device__ real _get_eta     (real R, real Z);
+__device__ real _get_hgas    (real R);
+__device__ real _get_hdust   (real R, real stokes);
+__device__ real _get_stokes  (real R, real Z, real size);
+__device__ real _get_omegaK  (real R);
+__device__ real _get_delta_R (real R, real h_gas);
+__device__ real _get_delta_Z (real R, real h_gas);
+
 // =========================================================================================================================
-// profile generators
+// randprofile.cu
 
 extern std::mt19937 rand_generator;
 

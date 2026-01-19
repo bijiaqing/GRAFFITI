@@ -39,7 +39,7 @@ EXEC = cuDust
 _INC = const.cuh cudust.cuh
 INC = $(patsubst %, $(INC_DIR)/%, $(_INC))
 
-_OBJ = collision.o diffusion.o fileoutput.o gridfields.o initializer.o integrator.o interpolator.o main.o randprofile.o
+_OBJ = collision.o diffusion.o fileoutput.o gridfields.o helperfunc.o initializer.o integrator.o interpolator.o main.o randprofile.o
 OBJ = $(patsubst %, $(OBJ_DIR)/%, $(_OBJ))
 
 .PHONY: all clean cleanall

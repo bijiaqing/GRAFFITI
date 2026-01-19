@@ -53,8 +53,8 @@ bool save_variable (const std::string &file_name)
     file << "KAPPA_0     = " << std::scientific     << std::setprecision(8) << KAPPA_0      << std::endl;
     #endif
     #ifdef DIFFUSION
-    file << "SCHMIDT_R   = " << std::scientific     << std::setprecision(8) << SCHMIDT_R    << std::endl;
-    file << "SCHMIDT_Z   = " << std::scientific     << std::setprecision(8) << SCHMIDT_Z    << std::endl;
+    file << "SC_R        = " << std::scientific     << std::setprecision(8) << SC_R    << std::endl;
+    file << "SC_Z        = " << std::scientific     << std::setprecision(8) << SC_Z    << std::endl;
     #endif
     #ifdef COLLISION
     file << "LAMBDA_0    = " << std::scientific     << std::setprecision(8) << LAMBDA_0     << std::endl;

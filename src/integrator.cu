@@ -65,8 +65,6 @@ void _if_out_of_box (real &x, real &y, real &z, real &lx, real &vy, real &lz)
     }
 }
 
-// =========================================================================================================================
-
 __device__ __forceinline__
 void _get_ctfg_term (real y, real z, real R, real l_x, real l_z, real &Fc_y, real &Tc_z)
 {

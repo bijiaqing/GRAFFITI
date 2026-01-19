@@ -26,7 +26,7 @@ real _get_grain_number (real size)
     // combining (2) and (3) there is 
     // (4) n_p(s) = n_2 * s^-1.5 (n_2 = const), which explains why pow_idx = -1.5 in main.cu
     
-    // note if all swarms have the same total mass, there is
+    // (note) if all swarms have the same total mass, there is
     // (3') n_d(s) = n_1 * s^-3 (n_1 = const)
     // combining (2) and (3') there is 
     // (4') n_p(s) = n_2 * s^-0.5 (n_2 = const), which explains why pow_idx = -0.5 in main.cu
@@ -46,24 +46,15 @@ real _get_grain_number (real size)
 
     // finally, combining (3) and (9), we know n_d(s)
 
-    real numr = M_D / N_PAR / RHO_0 / size / size;
+    real numr = M_D / N_PAR / _get_dust_mass(size);
 
     #ifdef RADIATION // keep total surface area for individual swarms the same
-
-        if (INIT_SMIN == INIT_SMAX)
-        {
-            numr /= size; // total mass the same <=> total surface area the same
-        }
-        else
-        {
-            numr *= (pow(INIT_SMIN, -0.5) - pow(INIT_SMAX, -0.5));
-            numr /= (pow(INIT_SMAX,  0.5) - pow(INIT_SMIN,  0.5));
-        }
-
-    #else // NO RADIATION, keep total mass for individual swarms the same
-    
-        numr /= size;
-    
+    if (INIT_SMIN != INIT_SMAX) // if min = max, converge back to normal monodisperse case
+    {
+        numr *= size;
+        numr *= (pow(INIT_SMIN, -0.5) - pow(INIT_SMAX, -0.5));
+        numr /= (pow(INIT_SMAX,  0.5) - pow(INIT_SMIN,  0.5));
+    }
     #endif // RADIATION
 
     return numr;
@@ -93,30 +84,6 @@ void particle_init (swarm *dev_particle,
         #endif // COLLISION
     }
 }
-
-// =========================================================================================================================
-
-#ifdef COLLISION
-
-__global__
-void treenode_init (tree *dev_treenode, const swarm *dev_particle)
-{
-    int idx = threadIdx.x+blockDim.x*blockIdx.x;
-
-    if (idx < N_PAR)
-    {
-        float x = static_cast<float>(dev_particle[idx].position.x);
-        float y = static_cast<float>(dev_particle[idx].position.y);
-        float z = static_cast<float>(dev_particle[idx].position.z);
-
-        dev_treenode[idx].cartesian.x = y*sin(z)*cos(x);
-        dev_treenode[idx].cartesian.y = y*sin(z)*sin(x);
-        dev_treenode[idx].cartesian.z = y*cos(z);
-        dev_treenode[idx].index_old   = idx;
-    }
-}
-
-#endif // COLLISION
 
 // =========================================================================================================================
 

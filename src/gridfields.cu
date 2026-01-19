@@ -49,24 +49,22 @@ void _particle_to_grid_core(real *dev_grid, const swarm *dev_particle, int idx)
     int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
     auto [next_x, next_y, next_z, frac_x, frac_y, frac_z] = _3d_interp_midpt_y(loc_x, loc_y, loc_z);
 
-    real par_size = dev_particle[idx].par_size;    
+    real size = dev_particle[idx].par_size;    
     real weight = 0.0;
 
     #ifdef RADIATION
     if (field_type == OPTDEPTH)
     {
-        weight  = RHO_0;
+        weight  = _get_dust_mass(size);
         weight *= dev_particle[idx].par_numr;
-        weight *= par_size*par_size*par_size;
-        weight *= KAPPA_0*(S_0 / par_size); // cross section per unit mass
+        weight *= KAPPA_0*(S_0 / size); // cross section per unit mass
     }
     else
     #endif // RADIATION
     if (field_type == DUSTDENS)
     {
-        weight  = RHO_0;
+        weight  = _get_dust_mass(size);
         weight *= dev_particle[idx].par_numr;
-        weight *= par_size*par_size*par_size;
     }
 
     atomicAdd(&dev_grid[idx_cell                           ], (1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z)*weight);
