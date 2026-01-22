@@ -1,6 +1,6 @@
 INC_DIR = ./inc
 OBJ_DIR = ./obj
-SRC_DIR = ./test
+SRC_DIR = ./src
 OUT_DIR = ./out
 
 NVCC = nvcc
