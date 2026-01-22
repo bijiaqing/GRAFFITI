@@ -1,6 +1,6 @@
 INC_DIR = ./inc
 OBJ_DIR = ./obj
-SRC_DIR = ./src
+SRC_DIR = ./test
 OUT_DIR = ./out
 
 NVCC = nvcc
@@ -16,6 +16,12 @@ NVCC += --diag-suppress 177,550
 # =========================================================================================================================
 # Compile-time feature flags
 # Uncomment lines below to enable specific physics modules
+
+# CODE_UNIT: Use code units instead of cgs units
+NVCC += -DCODE_UNIT
+
+# LOGOUTPUT: Use logarithmic output intervals
+NVCC += -DLOGOUTPUT
 
 # RADIATION: Enable radiation pressure calculations (optical depth, beta)
 # NVCC += -DRADIATION
@@ -36,10 +42,38 @@ NVCC += -DDIFFUSION
 
 EXEC = cuDust
 
-_INC = const.cuh cudust.cuh
-INC = $(patsubst %, $(INC_DIR)/%, $(_INC))
+_INC = const.cuh             \
+       cudust_host.cuh       \
+       cudust_kern.cuh       \
+       helpers_collision.cuh \
+       helpers_diskparam.cuh \
+       helpers_gridfield.cuh \
+       helpers_transport.cuh
 
-_OBJ = collision.o diffusion.o fileoutput.o gridfields.o helperfunc.o initializer.o integrator.o interpolator.o main.o randprofile.o
+_OBJ = col_flag_calc.o \
+       col_proc_exec.o \
+       col_rate_calc.o \
+       col_rate_init.o \
+       diffusion_pos.o \
+       diffusion_vel.o \
+       dustdens_calc.o \
+       dustdens_init.o \
+       dustdens_scat.o \
+       main.o          \
+       optdepth_calc.o \
+       optdepth_csum.o \
+       optdepth_init.o \
+       optdepth_mean.o \
+       optdepth_scat.o \
+       particle_init.o \
+       rs_grids_init.o \
+       rs_swarm_init.o \
+       ssa_substep_1.o \
+       ssa_substep_2.o \
+       ssa_transport.o \
+       treenode_init.o
+
+INC = $(patsubst %, $(INC_DIR)/%, $(_INC))
 OBJ = $(patsubst %, $(OBJ_DIR)/%, $(_OBJ))
 
 .PHONY: all clean cleanall

@@ -4,9 +4,14 @@
 #include <cmath>                            // for M_PI
 #include <string>                           // for std::string
 
+#if defined(COLLISION) || defined(DIFFUSION)
+#include "curand_kernel.h"                  // for curandState
+using curs = curandState;
+#endif // COLLISION and DIFFUSION
+
 #ifdef COLLISION
-#include "cukd/builder.h"                   // for cukd::get_coord
-using bbox = cukd::box_t<float3>;           // bbox is an axis-aligned bounding box type in cukd
+#include "cukd/builder.h"   // for cukd::get_coord, cukd::box_t
+using bbox = cukd::box_t<float3>;           // axis-aligned bounding box type for KD-tree
 #endif // COLLISION
 
 using real  = double;                       // code real type
@@ -19,55 +24,6 @@ const real  G           = 1.0;              // gravitational constant
 const real  M_S         = 1.0;              // mass of the central star
 const real  R_0         = 1.0;              // reference radius of the disk
 const real  S_0         = 1.0;              // the reference grain size of the dust, decoupled from R_0 for flexibility
-
-// =========================================================================================================================
-// gas paramters
-
-const real  SIGMA_0     = 1.0e-02;          // the reference gas surface density at R_0, used for dust dynamics and collision rate calculation
-const real  ASPR_0      = 0.05;             // the reference aspect ratio of the gas disk
-const real  IDX_P       = -1.0;             // the radial power-law index of the gas surface density profile
-const real  IDX_Q       = -0.4;             // the radial power-law index of the gas temperature profile (vertically isothermal)
-
-#ifndef CONST_NU
-const real  ALPHA       = 1.0e-4;           // the Shakura-Sunayev viscosity parameter of the gas
-#else
-const real  NU          = 1.0e-6;           // the kinematic viscosity parameter of the gas
-#endif // CONST_NU
-
-#ifndef CODE_UNIT
-const real  M_MOL       = 2.3*1.66054e-24;  // mean molecular weight of the gas in grams
-const real  X_SEC       = 2.0e-15;          // the cross section of H2 gas in cm^2
-#else
-const real  RE_0        = 1.0e+08;          // reference Reynolds number at R_0
-#endif // CODE_UNIT
-
-// =========================================================================================================================
-// dust parameters for dynamics
-
-const real  ST_0        = 1.0e-04;          // the reference Stokes number of dust with the reference size
-
-const real  M_D         = 1.0e30;           // the total dust mass in the disk, decoupled from M_S for flexibility
-const real  RHO_0       = 1.0;              // the reference internal density of the dust
-
-#ifdef RADIATION
-const real  BETA_0      = 1.0e+01;          // the reference ratio between the radiation pressure and the gravity
-const real  KAPPA_0     = 3.0e-28;          // the reference gray opacity of the dust
-#endif // RADIATION
-
-#ifdef DIFFUSION
-const real  SC_R        = 1.0e+10;          // the Schmidt number for radial   diffusion
-const real  SC_Z        = 1.0;              // the Schmidt number for vertical diffusion
-#endif // DIFFUSION
-
-#ifdef COLLISION
-const real  LAMBDA_0    = 1.0e-20;          // the reference collision rate of the dust
-const real  V_FRAG      = 1.0e-04;          // the fragmentation velocity for dust collision
-
-const int   K_COAG  = 0;                    // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
-
-const int   KNN_SIZE    = 100;              // the maximum number   for neighbor search 
-const float MAX_DIST    = 0.05;             // the maximum distance for neighbor search
-#endif // COLLISION
 
 // =========================================================================================================================
 // mesh domain size and resolution
@@ -83,8 +39,8 @@ const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 // const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 
 const int   N_Y         = 300;              // number of grid cells in Y direction (radius)
-const real  Y_MIN       = 1.0;              // minimum Y boundary (radius)
-const real  Y_MAX       = 3.0;              // maximum Y boundary (radius)
+const real  Y_MIN       = 0.5;              // minimum Y boundary (radius)
+const real  Y_MAX       = 1.5;              // maximum Y boundary (radius)
 
 // const int   N_Z         = 1;                // number of grid cells in Z direction (colattitude)
 // const real  Z_MIN       = 0.5*M_PI;         // minimum Z boundary (colattitude)
@@ -112,14 +68,75 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const int  SAVE_MAX     = 250;              // total number of outputs for mesh fields
-const int  SAVE_PAR     = 10;               // save particle data every X mesh outputs
+const int  SAVE_MAX     = 512;              // total number of outputs for mesh fields
 
-const real DT_OUT = 20.0*M_PI;              // time interval between adjascent outputs
-const real DT_DYN = 2.0*M_PI / 1000;        // time interval between adjascent outputs
+#ifdef LOGOUTPUT
+const int  LOG_BASE     = 2;                // save particle data at t = DT_OUT*LOG_BASE^N, N = 0, 1, 2, ...
+#else // Linear output
+const int  LIN_BASE     = 1;                // save particle data at t = DT_OUT*LIN_BASE*N, N = 0, 1, 2, ...
+#endif // LOGOUTPUT
+
+const real DT_OUT       = 100.0 / 128.0;    // 100*2^-7 = 0.78125
+const real DT_DYN       = 100.0 / 4096.0;   // 100*2^-12 = 0.0244140625
+
+// const real DT_OUT       = 2.0*M_PI;         // time interval between adjascent outputs
+// const real DT_DYN       = 2.0*M_PI / 1000;  // time interval between adjascent outputs
 // const real DT_DYN = 2.0*M_PI/static_cast<real>(N_X);
 
 const std::string PATH_OUT = "./out/";
+
+// =========================================================================================================================
+// gas parameters
+
+const real  SIGMA_0     = 1.0e-02;          // the reference gas surface density at R_0, used for collision rate calculation
+const real  ASPR_0      = 0.05;             // the reference aspect ratio of the gas disk
+const real  IDX_P       = -1.0;             // the radial power-law index of the gas surface density profile
+const real  IDX_Q       = -0.4;             // the radial power-law index of the gas temperature profile (vertically isothermal)
+
+#if defined(DIFFUSION) || defined(COLLISION)
+#ifndef CONST_NU
+const real  ALPHA       = 1.0e-02;          // the Shakura-Sunayev viscosity parameter of the gas
+#else
+const real  NU          = 1.0e-04;          // the kinematic viscosity parameter of the gas
+#endif // CONST_NU
+#endif // DIFFUSION or COLLISION
+
+#ifdef COLLISION
+#ifndef CODE_UNIT
+const real  M_MOL       = 2.3*1.66054e-24;  // mean molecular weight of the gas in grams
+const real  X_SEC       = 2.0e-15;          // the cross section of H2 gas in cm^2
+#else
+const real  RE_0        = 1.0e+08;          // reference Reynolds number at R_0
+#endif // CODE_UNIT
+#endif // COLLISION
+
+// =========================================================================================================================
+// dust parameters for dynamics
+
+const real  ST_0        = 1.0e-04;          // the reference Stokes number of dust with the reference size
+
+const real  M_D         = 1.0e30;           // the total dust mass in the disk, decoupled from M_S for flexibility
+const real  RHO_0       = 1.0;              // the reference internal density of the dust
+
+#ifdef RADIATION
+const real  BETA_0      = 1.0e+01;          // the reference ratio between the radiation pressure and the gravity
+const real  KAPPA_0     = 3.0e-28;          // the reference gray opacity of the dust
+#endif // RADIATION
+
+#if defined(DIFFUSION) || defined(COLLISION)
+const real  SC_R        = 1.0e+10;          // the Schmidt number for radial   diffusion
+const real  SC_Z        = 1.0;              // the Schmidt number for vertical diffusion
+#endif // DIFFUSION or COLLISION
+
+#ifdef COLLISION
+const real  LAMBDA_0    = 1.0e-20;          // the reference collision rate of the dust
+const real  V_FRAG      = 1.0e-04;          // the fragmentation velocity for dust collision
+
+const int   K_COAG      = 0;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
+const int   KNN_SIZE    = 100;              // the maximum number   for KNN neighbor search 
+
+const float MAX_DIST    = 0.05;             // the maximum distance for KNN neighbor search
+#endif // COLLISION
 
 // =========================================================================================================================
 // structures
@@ -137,14 +154,14 @@ struct swarm                                // for particle swarm
 };
 
 #ifdef COLLISION
-struct tree                                 // for cukd::builder
+struct tree                                 // KD-tree node structure for cukd::builder
 {
     float3  cartesian;                      // xyz position of a tree node in Cartesian coordinate
-    int     index_old;                      // index of the partile before index shuffling by the KD-tree builder
+    int     index_old;                      // index of the particle before index shuffling by the KD-tree builder
     int     split_dim;                      // splitting dimension of the tree node
 };
 
-struct tree_traits                          // for cukd::builder
+struct tree_traits                          // traits for cukd::builder
 {
     using point_t = float3;
     enum { has_explicit_dim = true };
@@ -156,21 +173,6 @@ struct tree_traits                          // for cukd::builder
     static inline __host__ __device__ void set_dim (tree &node, int dim) { node.split_dim = dim; }
 };
 #endif // COLLISION
-
-struct interp                               // used in _3d_interp_midpt_y in mesh.cu
-{
-    int  next_x, next_y, next_z;            // indices of the next grid cell in each direction
-    real frac_x, frac_y, frac_z;            // fractional distance to the next grid cell in each direction
-};
-
-enum GridFieldType                          // used in _particle_to_grid_core in mesh.cu
-{
-    DUSTDENS,                               // dust density field
-
-    #ifdef RADIATION
-    OPTDEPTH,                               // optical depth field
-    #endif // RADIATION
-};
 
 // =========================================================================================================================
 // cuda numerical parameters

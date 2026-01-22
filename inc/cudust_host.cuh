@@ -1,0 +1,332 @@
+#ifndef CUDUST_HOST_CUH 
+#define CUDUST_HOST_CUH
+
+#include <algorithm>        // for std::lower_bound
+#include <chrono>           // for std::chrono::system_clock
+#include <ctime>            // for std::time_t, std::time, std::ctime
+#include <fstream>          // for std::ofstream, std::ifstream
+#include <iomanip>          // for std::setw, std::setfill, std::setprecision
+#include <iostream>         // for std::cout, std::endl
+#include <random>           // for std::mt19937
+#include <string>           // for std::string
+#include <vector>           // for std::vector
+
+#include "const.cuh"
+
+// =========================================================================================================================
+// Random profile generation
+// Note: rand_generator must be defined in exactly one .cu file (e.g., main.cu)
+// =========================================================================================================================
+
+extern std::mt19937 rand_generator;
+
+inline __host__
+void rand_uniform (real *profile, int number, real p_min, real p_max)
+{
+    std::uniform_real_distribution <real> random(0.0, 1.0);
+
+    for (int i = 0; i < number; i++)
+    {
+        profile[i] = p_min + (p_max - p_min)*random(rand_generator);
+    }
+}
+
+inline __host__
+void rand_gaussian (real *profile, int number, real p_min, real p_max, real mu, real std)
+{
+    std::normal_distribution <real> random(mu, std);
+
+    for (int i = 0; i < number; i++)
+    {
+        real value;
+        
+        do
+        {
+            value = random(rand_generator);
+        } 
+        while (value < p_min || value > p_max);
+        
+        profile[i] = value;
+    }
+}
+
+inline __host__
+void rand_pow_law (real *profile, int number, real p_min, real p_max, real idx_pow)
+{
+    std::uniform_real_distribution <real> random(0.0, 1.0);
+
+    real tmp_min = std::pow(p_min, idx_pow + 1.0);
+    real tmp_max = std::pow(p_max, idx_pow + 1.0);
+
+    // check https://mathworld.wolfram.com/RandomNumber.html for derivations
+    // NOTE: this is the probability distribution function dN(x) ~ x^n*dx
+    for (int i = 0; i < number; i++)
+    {
+        profile[i] = std::pow((tmp_max - tmp_min)*random(rand_generator) + tmp_min, 1.0/(idx_pow + 1.0));
+    }
+}
+
+inline static __host__
+real _gaussian (real x, real mu, real std)
+{
+    return std::exp(-(x - mu)*(x - mu)/(2.0*std*std));
+}
+
+inline static __host__
+real _tapered_pow (real x, real x_min, real x_max, real idx_pow)
+{
+    if (x >= x_min && x <= x_max)
+    {
+        return std::pow(x / x_min, idx_pow);
+    }
+    else
+    {
+        return 0.0;
+    }
+}
+
+inline __host__
+void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_pow, real smooth, int bins)
+{
+    // a convolved (i.e., smoothed) power-law profile
+    
+    // x_min and x_max define the hard boundary of the smoothed profile
+    // p_min and p_max define the domain that is not too much smoothed
+    real p_min = x_min + 2.0*smooth;
+    real p_max = x_max - 2.0*smooth;
+    
+    // Build x-axis and compute convolved profile
+    std::vector<real> x_axis(bins + 1);
+    std::vector<real> y_axis(bins + 1, 0.0);
+    
+    real dx = (x_max - x_min) / static_cast<real>(bins);
+    
+    for (int i = 0; i < bins + 1; i++)
+    {
+        x_axis[i] = x_min + i*dx;
+    }
+
+    // Convolve tapered power law with Gaussian kernel
+    for (int j = 0; j < bins + 1; j++)
+    {
+        for (int k = 0; k < bins + 1; k++)
+        {
+            y_axis[k] += _tapered_pow(x_axis[j], p_min, p_max, idx_pow)*_gaussian(x_axis[k], x_axis[j], 0.5*smooth);
+        }
+    }
+
+    // Build CDF for inverse transform sampling
+    std::uniform_real_distribution<real> random(0.0, 1.0);
+    std::vector<real> cdf(bins + 1);
+    cdf[0] = 0.0;
+    
+    for (int bin_idx = 1; bin_idx <= bins; bin_idx++)
+    {
+        cdf[bin_idx] = cdf[bin_idx - 1] + y_axis[bin_idx]*dx;
+    }
+    
+    real cdf_total = cdf[bins];
+    
+    for (int bin_idx = 0; bin_idx <= bins; bin_idx++)
+    {
+        cdf[bin_idx] /= cdf_total;  // normalize to [0,1]
+    }
+
+    // Sample using binary search, more efficient than rejection sampling
+    for (int sample_idx = 0; sample_idx < number; sample_idx++)
+    {
+        real u_sample = random(rand_generator);
+        auto cdf_iter = std::lower_bound(cdf.begin(), cdf.end(), u_sample);
+        int bin_lower = cdf_iter - cdf.begin();
+        
+        // interpolate between x_axis[bin_lower-1] and x_axis[bin_lower]
+        real bin_frac = (u_sample - cdf[bin_lower - 1]) / (cdf[bin_lower] - cdf[bin_lower - 1]);
+        profile[sample_idx] = x_axis[bin_lower - 1] + bin_frac*dx;
+    }
+}
+
+// =========================================================================================================================
+// Binary file I/O templates
+// =========================================================================================================================
+
+template <typename DataType> __host__ inline
+bool save_binary (const std::string &file_name, DataType *data, int number)
+{
+    std::ofstream file(file_name, std::ios::binary);
+    if (!file) return false;
+    
+    file.write(reinterpret_cast<char*>(data), sizeof(DataType)*number);
+    return file.good();
+}
+
+template <typename DataType> __host__ inline
+bool load_binary (const std::string &file_name, DataType *data, int number)
+{
+    std::ifstream file(file_name, std::ios::binary);
+    if (!file) return false;
+    
+    file.read(reinterpret_cast<char*>(data), sizeof(DataType)*number);
+    return file.good();
+}
+
+// =========================================================================================================================
+// File I/O helpers
+// =========================================================================================================================
+
+inline __host__
+void msg_output (int idx_file)
+{
+    std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::cout   
+        << std::endl << std::setfill('0')
+        << std::setw(3) << idx_file << "/" 
+        << std::setw(3) << SAVE_MAX << " finished on " << std::ctime(&end_time)
+        << std::endl;
+}
+
+inline __host__
+std::string frame_num (int number, std::size_t length = 5)
+{
+    std::string str = std::to_string(number);
+    if (str.length() < length) str.insert(0, length - str.length(), '0');
+    return str;
+}
+
+#ifdef LOGOUTPUT
+inline __host__
+bool is_log_power (int idx_file)
+{
+    // Check if n is an integer power of LOG_BASE (including 0th power: n=1)
+    if (LOG_BASE == 2)
+    {
+        // Fast bit-manipulation for powers of 2
+        return (idx_file > 0) && ((idx_file & (idx_file - 1)) == 0);
+    }
+    else
+    {
+        // General case for any base
+        if (idx_file <= 0)
+        {
+            return false;
+        }
+
+        while (idx_file % LOG_BASE == 0)
+        {
+            idx_file /= LOG_BASE;
+        }
+
+        return (idx_file == 1);
+    }
+}
+#endif // LOGOUTPUT
+
+inline __host__
+bool save_variable (const std::string &file_name)
+{
+    std::ofstream file(file_name);
+    if (!file) return false;
+    
+    file << "[PARAMETERS]"                                                                  << std::endl;
+    file                                                                                    << std::endl;
+
+    // Gas parameters
+    file << "SIGMA_0     = " << std::scientific     << std::setprecision(8) << SIGMA_0      << std::endl;
+    file << "ASPR_0      = " << std::defaultfloat   << std::setprecision(8) << ASPR_0       << std::endl;
+    file << "IDX_P       = " << std::defaultfloat   << std::setprecision(8) << IDX_P        << std::endl;
+    file << "IDX_Q       = " << std::defaultfloat   << std::setprecision(8) << IDX_Q        << std::endl;
+    #if defined(DIFFUSION) || defined(COLLISION)
+    #ifndef CONST_NU
+    file << "ALPHA       = " << std::scientific     << std::setprecision(8) << ALPHA        << std::endl;
+    #else
+    file << "NU          = " << std::scientific     << std::setprecision(8) << NU           << std::endl;
+    #endif // CONST_NU
+    #endif // DIFFUSION or COLLISION
+    #ifdef COLLISION
+    #ifndef CODE_UNIT
+    file << "M_MOL       = " << std::scientific     << std::setprecision(8) << M_MOL        << std::endl;
+    file << "X_SEC       = " << std::scientific     << std::setprecision(8) << X_SEC        << std::endl;
+    #else
+    file << "RE_0        = " << std::scientific     << std::setprecision(8) << RE_0         << std::endl;
+    #endif // CODE_UNIT
+    #endif // COLLISION
+    file                                                                                    << std::endl;
+    
+    // Dust parameters
+    file << "ST_0        = " << std::scientific     << std::setprecision(8) << ST_0         << std::endl;
+    file << "M_D         = " << std::scientific     << std::setprecision(8) << M_D          << std::endl;
+    file << "RHO_0       = " << std::scientific     << std::setprecision(8) << RHO_0        << std::endl;
+    #ifdef RADIATION
+    file << "BETA_0      = " << std::scientific     << std::setprecision(8) << BETA_0       << std::endl;
+    file << "KAPPA_0     = " << std::scientific     << std::setprecision(8) << KAPPA_0      << std::endl;
+    #endif // RADIATION
+    #if defined(DIFFUSION) || defined(COLLISION)
+    file << "SC_R        = " << std::scientific     << std::setprecision(8) << SC_R         << std::endl;
+    file << "SC_Z        = " << std::scientific     << std::setprecision(8) << SC_Z         << std::endl;
+    #endif // DIFFUSION or COLLISION
+    #ifdef COLLISION
+    file << "LAMBDA_0    = " << std::scientific     << std::setprecision(8) << LAMBDA_0     << std::endl;
+    file << "V_FRAG      = " << std::scientific     << std::setprecision(8) << V_FRAG       << std::endl;
+    file << "K_COAG      = " << std::defaultfloat   << std::setprecision(8) << K_COAG       << std::endl;
+    file << "KNN_SIZE    = " << std::defaultfloat   << std::setprecision(8) << KNN_SIZE     << std::endl;
+    file << "MAX_DIST    = " << std::scientific     << std::setprecision(8) << MAX_DIST     << std::endl;
+    #endif // COLLISION
+    file                                                                                    << std::endl;
+
+    // Mesh domain
+    file << "N_PAR       = " << std::scientific     << std::setprecision(8) << N_PAR        << std::endl;
+    file                                                                                    << std::endl;
+    file << "N_X         = " << std::defaultfloat   << std::setprecision(8) << N_X          << std::endl;
+    file << "X_MIN       = " << std::defaultfloat   << std::setprecision(8) << X_MIN        << std::endl;
+    file << "X_MAX       = " << std::defaultfloat   << std::setprecision(8) << X_MAX        << std::endl;
+    file                                                                                    << std::endl;
+    file << "N_Y         = " << std::defaultfloat   << std::setprecision(8) << N_Y          << std::endl;
+    file << "Y_MIN       = " << std::defaultfloat   << std::setprecision(8) << Y_MIN        << std::endl;
+    file << "Y_MAX       = " << std::defaultfloat   << std::setprecision(8) << Y_MAX        << std::endl;
+    file                                                                                    << std::endl;
+    file << "N_Z         = " << std::defaultfloat   << std::setprecision(8) << N_Z          << std::endl;
+    file << "Z_MIN       = " << std::defaultfloat   << std::setprecision(8) << Z_MIN        << std::endl;
+    file << "Z_MAX       = " << std::defaultfloat   << std::setprecision(8) << Z_MAX        << std::endl;
+    file                                                                                    << std::endl;
+
+    // Initialization parameters
+    file << "INIT_XMIN   = " << std::defaultfloat   << std::setprecision(8) << INIT_XMIN    << std::endl;
+    file << "INIT_XMAX   = " << std::defaultfloat   << std::setprecision(8) << INIT_XMAX    << std::endl;
+    file << "INIT_YMIN   = " << std::defaultfloat   << std::setprecision(8) << INIT_YMIN    << std::endl;
+    file << "INIT_YMAX   = " << std::defaultfloat   << std::setprecision(8) << INIT_YMAX    << std::endl;
+    file << "INIT_ZMIN   = " << std::defaultfloat   << std::setprecision(8) << INIT_ZMIN    << std::endl;
+    file << "INIT_ZMAX   = " << std::defaultfloat   << std::setprecision(8) << INIT_ZMAX    << std::endl;
+    file << "INIT_SMIN   = " << std::scientific     << std::setprecision(8) << INIT_SMIN    << std::endl;
+    file << "INIT_SMAX   = " << std::scientific     << std::setprecision(8) << INIT_SMAX    << std::endl;
+    file                                                                                    << std::endl;
+
+    // Time step and output
+    file << "SAVE_MAX    = " << std::defaultfloat   << std::setprecision(8) << SAVE_MAX     << std::endl;
+    #ifdef LOGOUTPUT
+    file << "LOG_BASE    = " << std::defaultfloat   << std::setprecision(8) << LOG_BASE     << std::endl;
+    #else
+    file << "LIN_BASE    = " << std::defaultfloat   << std::setprecision(8) << LIN_BASE     << std::endl;
+    #endif // LOGOUTPUT
+    file << "DT_OUT      = " << std::scientific     << std::setprecision(8) << DT_OUT       << std::endl;
+    file << "DT_DYN      = " << std::scientific     << std::setprecision(8) << DT_DYN       << std::endl;
+    file << "PATH_OUT    = "                                                << PATH_OUT     << std::endl;
+    file                                                                                    << std::endl;
+
+    // Swarm structure as numpy dtype (configparser-compatible)
+    // dtype = np.dtype([(name, dtype) for name, dtype in config['SWARM_DTYPE'].items()])
+    file << "[SWARM_DTYPE]"                                                                 << std::endl;
+    file << "position_x = f8"                                                               << std::endl;
+    file << "position_y = f8"                                                               << std::endl;
+    file << "position_z = f8"                                                               << std::endl;
+    file << "velocity_x = f8"                                                               << std::endl;
+    file << "velocity_y = f8"                                                               << std::endl;
+    file << "velocity_z = f8"                                                               << std::endl;
+    file << "par_size   = f8"                                                               << std::endl;
+    file << "par_numr   = f8"                                                               << std::endl;
+    #ifdef COLLISION
+    file << "col_rate   = f8"                                                               << std::endl;
+    #endif // COLLISION
+    
+    return file.good();
+}
+
+#endif // CUDUST_HOST_CUH

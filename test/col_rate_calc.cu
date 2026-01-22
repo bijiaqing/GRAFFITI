@@ -1,0 +1,65 @@
+#ifdef COLLISION
+
+#include "cudust_kern.cuh"
+#include "helpers_collision.cuh"
+
+// =========================================================================================================================
+// Kernel: col_rate_calc
+// Purpose: Calculate total collision rate for each grid cell
+// Dependencies: helpers_collision.cuh (provides candidatelist, KernelType, vrel helpers, _get_col_rate_ij)
+// =========================================================================================================================
+
+__global__
+void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_treenode, const bbox *dev_boundbox)
+{
+    // calculates the total collision rate for each cell, to help determine whether a collision is going to happen in the cell
+    // it goes through each particle (i) and calculates the colision rate of it, then adds the rate to the corresponding cell
+    
+    int idx_tree = threadIdx.x+blockDim.x*blockIdx.x; // this is the index for the particle (idx_old_i) on the k-d tree
+
+    if (idx_tree < N_PAR)
+    {
+        int idx_old_i = dev_treenode[idx_tree].index_old;
+        
+        real loc_x = _get_loc_x(dev_particle[idx_old_i].position.x);
+        real loc_y = _get_loc_y(dev_particle[idx_old_i].position.y);
+        real loc_z = _get_loc_z(dev_particle[idx_old_i].position.z);
+
+        bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
+        bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
+        bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
+
+        if (!(in_x && in_y && in_z)) return; // particle is out of bounds, do nothing
+
+        int  idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+        real vol_cell = _get_grid_volume(idx_cell); // volume of the cell that particle i is in
+        
+        candidatelist query_result(MAX_DIST);
+        cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
+            dev_treenode[idx_tree].cartesian, *dev_boundbox, dev_treenode, N_PAR);
+
+        real col_rate_ij = 0.0; // collision rate between particle i and j
+        real col_rate_i  = 0.0; // total collision rate for particle i
+
+        int idx_old_j, idx_query;
+
+        for(int j = 0; j < KNN_SIZE; j++)
+        {
+            col_rate_ij = 0.0;
+            idx_query = query_result.returnIndex(j);
+
+            if (idx_query != -1) // if the j-th nearest neighbor exists within MAX_DIST
+            {
+                idx_old_j = dev_treenode[idx_query].index_old;
+                col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(K_COAG)> (dev_particle, idx_old_i, idx_old_j, vol_cell);
+            }
+
+            col_rate_i += col_rate_ij;
+        }
+
+        dev_particle[idx_old_i].col_rate = col_rate_i;
+        atomicAdd(&dev_col_rate[idx_cell], col_rate_i);
+    }
+}
+
+#endif // COLLISION

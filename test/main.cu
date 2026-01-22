@@ -1,7 +1,7 @@
 #include <chrono>           // for std::chrono::system_clock
 #include <iomanip>          // for std::setw, std::setfill
-#include <sstream>          // for std::stringstream
 #include <iostream>         // for std::cout, std::endl
+#include <sstream>          // for std::stringstream
 #include <sys/stat.h>       // for mkdir
 
 #ifdef COLLISION
@@ -9,7 +9,8 @@
 #include <thrust/extrema.h>     // for thrust::max_element
 #endif // COLLISION
 
-#include "cudust.cuh"
+#include "cudust_kern.cuh"
+#include "cudust_host.cuh"
 
 std::mt19937 rand_generator;
 
@@ -157,7 +158,7 @@ int main (int argc, char **argv)
         fname = PATH_OUT + "particle_" + frame_num(idx_resume) + ".dat";
         save_binary(fname, particle, N_PAR);
 
-        log_output(0);
+        msg_output(0);
     }
     else
     {
@@ -184,7 +185,7 @@ int main (int argc, char **argv)
         rs_grids_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rs_grids);
         #endif // COLLISION
 
-        log_output(idx_resume);
+        msg_output(idx_resume);
     }
 
     for (int idx_file = 1 + idx_resume; idx_file <= SAVE_MAX; idx_file++)    // main evolution loop
@@ -235,8 +236,7 @@ int main (int argc, char **argv)
                 dt_col = fmin(dt_col, dt_dyn - timer_dyn);
 
                 col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_flag, dev_rs_grids, dev_col_rand, dev_col_rate, dt_col);
-                run_collision <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dev_col_expt, dev_col_rand, 
-                    dev_col_flag, dev_treenode, dev_boundbox);
+                col_proc_exec <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dev_col_expt, dev_col_rand, dev_col_flag, dev_treenode, dev_boundbox);
 
                 cudaDeviceSynchronize();
 
@@ -271,11 +271,11 @@ int main (int argc, char **argv)
             optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
             ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
             #else
-            ssa_integrate <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
+            ssa_transport <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
             #endif // RADIATION
             
             #ifdef DIFFUSION
-            pos_diffusion <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dt_dyn);
+            diffusion_pos <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dt_dyn);
             #endif // DIFFUSION
 
             cudaDeviceSynchronize();
@@ -326,14 +326,23 @@ int main (int argc, char **argv)
         save_binary(fname, optdepth, N_GRD);
         #endif // RADIATION
 
-        if (idx_file % SAVE_PAR == 0)
+        #ifdef LOGOUTPUT
+        if (is_log_power(idx_file))
         {
             cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
             fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
             save_binary(fname, particle, N_PAR);
         }
+        #else // Linear output
+        if (idx_file % LIN_BASE == 0)
+        {
+            cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
+            fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
+            save_binary(fname, particle, N_PAR);
+        }
+        #endif // LOGOUTPUT
 
-        log_output(idx_file);
+        msg_output(idx_file);
     }
  
     return 0;
