@@ -113,7 +113,7 @@ const real  RE_0        = 1.0e+08;          // reference Reynolds number at R_0
 // =========================================================================================================================
 // dust parameters for dynamics
 
-const real  ST_0        = 1.0e-04;          // the reference Stokes number of dust with the reference size
+const real  ST_0        = 1.0e-01;          // the reference Stokes number of dust with the reference size
 
 const real  M_D         = 1.0e30;           // the total dust mass in the disk, decoupled from M_S for flexibility
 const real  RHO_0       = 1.0;              // the reference internal density of the dust
