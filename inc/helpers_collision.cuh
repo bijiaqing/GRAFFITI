@@ -14,7 +14,7 @@
 // Collision helper type definitions
 // =========================================================================================================================
 
-using candidatelist = cukd::HeapCandidateList<KNN_SIZE>;
+using candidatelist = cukd::HeapCandidateList<N_K>;
 
 enum KernelType { 
     CONSTANT_KERNEL = 0, 
@@ -330,7 +330,7 @@ real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j)
     {
         if (threadIdx.x == 0 && blockIdx.x == 0) // KernelType is a compile-time constant
         {
-            printf("ERROR: Invalid K_COAG value = %d \n", static_cast<int>(kernel));
+            printf("ERROR: Invalid COAG_KERNEL value = %d \n", static_cast<int>(kernel));
         }
         
         assert(false);

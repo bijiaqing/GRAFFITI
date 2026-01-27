@@ -26,6 +26,23 @@ const real  R_0         = 1.0;              // reference radius of the disk
 const real  S_0         = 1.0;              // the reference grain size of the dust, decoupled from R_0 for flexibility
 
 // =========================================================================================================================
+// mesh domain size and resolution
+
+const int   N_PAR       = 1e+07;            // total number of super-particles in the model
+
+const int   N_X         = 50;              // number of grid cells in X direction (azimuth)
+const real  X_MIN       = -M_PI;            // minimum X boundary (azimuth)
+const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
+
+const int   N_Y         = 50;              // number of grid cells in Y direction (radius)
+const real  Y_MIN       = 0.5;              // minimum Y boundary (radius)
+const real  Y_MAX       = 1.5;              // maximum Y boundary (radius)
+
+const int   N_Z         = 50;              // number of grid cells in Z direction (colattitude)
+const real  Z_MIN       = 0.5*M_PI - 0.2;   // minimum Z boundary (colattitude)
+const real  Z_MAX       = 0.5*M_PI + 0.2;   // maximum Z boundary (colattitude)
+
+// =========================================================================================================================
 // gas parameters
 
 const real  SIGMA_0     = 1.0e-02;          // the reference gas surface density at R_0, used for collision rate calculation
@@ -69,29 +86,12 @@ const real  SC_Z        = 1.0;              // the Schmidt number for vertical d
 #endif // DIFFUSION or COLLISION
 
 #ifdef COLLISION
-const int   K_COAG      = 2;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
-const int   KNN_SIZE    = 200;              // the maximum number   for KNN neighbor search 
+const int   COAG_KERNEL = 2;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
+const int   N_K         = 200;              // the maximum number for KNN neighbor search 
 
-const real  LAMBDA_0    = N_X*N_Y*N_Z/KNN_SIZE;          // the reference collision rate of the dust
-const real  V_FRAG      = 1.0e-04;          // the fragmentation velocity for dust collision
+const real  LAMBDA_0    = N_X*N_Y*N_Z/N_K;  // the reference collision rate of the dust
+const real  V_FRAG      = 1.0;              // the fragmentation velocity for dust collision
 #endif // COLLISION
-
-// =========================================================================================================================
-// mesh domain size and resolution
-
-const int   N_PAR       = 1e+07;            // total number of super-particles in the model
-
-const int   N_X         = 50;              // number of grid cells in X direction (azimuth)
-const real  X_MIN       = -M_PI;            // minimum X boundary (azimuth)
-const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
-
-const int   N_Y         = 50;              // number of grid cells in Y direction (radius)
-const real  Y_MIN       = 0.5;              // minimum Y boundary (radius)
-const real  Y_MAX       = 1.5;              // maximum Y boundary (radius)
-
-const int   N_Z         = 50;              // number of grid cells in Z direction (colattitude)
-const real  Z_MIN       = 0.5*M_PI - 0.2;   // minimum Z boundary (colattitude)
-const real  Z_MAX       = 0.5*M_PI + 0.2;   // maximum Z boundary (colattitude)
 
 // =========================================================================================================================
 // dust initialization parameters

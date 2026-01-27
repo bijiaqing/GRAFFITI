@@ -74,14 +74,14 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             volume = 1.0; // for testing purposes
 
             // if particle idx_old_j *first* makes expt >= rand, it is the one that idx_old_i is going to collide with
-            while (col_expt_ij < col_rand_ij && j < KNN_SIZE)
+            while (col_expt_ij < col_rand_ij && j < N_K)
             {
                 idx_query = query_result.returnIndex(j);
 
                 if (idx_query != -1)
                 {   
                     idx_old_j = dev_treenode[idx_query].index_old;
-                    col_expt_ij += _get_col_rate_ij<static_cast<KernelType>(K_COAG)>(dev_particle, idx_old_i, idx_old_j) / volume;
+                    col_expt_ij += _get_col_rate_ij<static_cast<KernelType>(COAG_KERNEL)>(dev_particle, idx_old_i, idx_old_j) / volume;
                 }
 
                 j++;

@@ -49,7 +49,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
 
         int idx_old_j, idx_query;
 
-        for(int j = 0; j < KNN_SIZE; j++)
+        for(int j = 0; j < N_K; j++)
         {
             col_rate_ij = 0.0;
             idx_query = query_result.returnIndex(j);
@@ -60,7 +60,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
                 max_dist2 = fmaxf(max_dist2, dist2);
                 
                 idx_old_j = dev_treenode[idx_query].index_old;
-                col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(K_COAG)> (dev_particle, idx_old_i, idx_old_j);
+                col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(COAG_KERNEL)> (dev_particle, idx_old_i, idx_old_j);
             }
 
             col_rate_i += col_rate_ij;

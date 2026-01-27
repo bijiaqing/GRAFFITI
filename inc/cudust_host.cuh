@@ -305,8 +305,8 @@ bool save_variable (const std::string &file_name)
     #ifdef COLLISION
     file << "LAMBDA_0    = " << std::scientific     << std::setprecision(8) << LAMBDA_0     << std::endl;
     file << "V_FRAG      = " << std::scientific     << std::setprecision(8) << V_FRAG       << std::endl;
-    file << "K_COAG      = " << std::defaultfloat   << std::setprecision(8) << K_COAG       << std::endl;
-    file << "KNN_SIZE    = " << std::defaultfloat   << std::setprecision(8) << KNN_SIZE     << std::endl;
+    file << "COAG_KERNEL      = " << std::defaultfloat   << std::setprecision(8) << COAG_KERNEL       << std::endl;
+    file << "N_K    = " << std::defaultfloat   << std::setprecision(8) << N_K     << std::endl;
     #endif // COLLISION
     file                                                                                    << std::endl;
 
