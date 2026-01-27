@@ -1,4 +1,4 @@
-#ifndef RADIATION
+#if defined(TRANSPORT) && !defined(RADIATION)
 
 #include "cudust_kern.cuh"
 #include "helpers_transport.cuh"
@@ -35,4 +35,6 @@ void ssa_transport (swarm *dev_particle, real dt)
     }
 }
 
-#endif // RADIATION
+// =========================================================================================================================
+
+#endif // NO RADIATION

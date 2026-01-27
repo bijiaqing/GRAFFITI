@@ -1,4 +1,4 @@
-
+#ifdef SAVE_DENS
 
 #include "cudust_kern.cuh"
 #include "helpers_diskparam.cuh"
@@ -20,3 +20,7 @@ void dustdens_calc (real *dev_dustdens)
         dev_dustdens[idx] /= volume;
     }
 }
+
+// =========================================================================================================================
+
+#endif // SAVE_DENS

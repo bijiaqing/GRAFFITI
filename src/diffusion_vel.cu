@@ -1,4 +1,4 @@
-#ifdef DIFFUSION
+#if defined(TRANSPORT) && defined(DIFFUSION)
 
 #include "cudust_kern.cuh"
 
@@ -19,5 +19,7 @@ void diffusion_vel (swarm *dev_particle, curs *dev_rs_swarm, real dt)
         // TODO: Implement velocity diffusion
     }
 }
+
+// =========================================================================================================================
 
 #endif // DIFFUSION

@@ -1,4 +1,4 @@
-#if defined(COLLISION) || defined(DIFFUSION)
+#if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
 
 #include "cudust_kern.cuh"
 
@@ -18,5 +18,7 @@ void rs_swarm_init (curs *dev_rs_swarm, int seed)
         curand_init(seed, idx, 0, &dev_rs_swarm[idx]);
     }
 }
+
+// =========================================================================================================================
 
 #endif // COLLISION or DIFFUSION

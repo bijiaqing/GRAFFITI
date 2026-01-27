@@ -1,4 +1,4 @@
-#ifdef RADIATION
+#if defined(TRANSPORT) && defined(RADIATION)
 
 #include "cudust_kern.cuh"
 #include "helpers_diskparam.cuh"
@@ -22,5 +22,7 @@ void optdepth_calc (real *dev_optdepth)
         dev_optdepth[idx] *= y0*(dy - 1.0); // prepare for radial integration
     }
 }
+
+// =========================================================================================================================
 
 #endif // RADIATION

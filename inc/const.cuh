@@ -4,10 +4,10 @@
 #include <cmath>                            // for M_PI
 #include <string>                           // for std::string
 
-#if defined(COLLISION) || defined(DIFFUSION)
+#if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
 #include "curand_kernel.h"                  // for curandState
 using curs = curandState;
-#endif // COLLISION and DIFFUSION
+#endif // COLLISION or DIFFUSION
 
 #ifdef COLLISION
 #include "cukd/builder.h"   // for cukd::get_coord, cukd::box_t
@@ -30,15 +30,15 @@ const real  S_0         = 1.0;              // the reference grain size of the d
 
 const int   N_PAR       = 1e+07;            // total number of super-particles in the model
 
-const int   N_X         = 50;              // number of grid cells in X direction (azimuth)
+const int   N_X         = 50;               // number of grid cells in X direction (azimuth)
 const real  X_MIN       = -M_PI;            // minimum X boundary (azimuth)
 const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 
-const int   N_Y         = 50;              // number of grid cells in Y direction (radius)
+const int   N_Y         = 50;               // number of grid cells in Y direction (radius)
 const real  Y_MIN       = 0.5;              // minimum Y boundary (radius)
 const real  Y_MAX       = 1.5;              // maximum Y boundary (radius)
 
-const int   N_Z         = 50;              // number of grid cells in Z direction (colattitude)
+const int   N_Z         = 50;               // number of grid cells in Z direction (colattitude)
 const real  Z_MIN       = 0.5*M_PI - 0.2;   // minimum Z boundary (colattitude)
 const real  Z_MAX       = 0.5*M_PI + 0.2;   // maximum Z boundary (colattitude)
 
@@ -50,21 +50,21 @@ const real  ASPR_0      = 0.05;             // the reference aspect ratio of the
 const real  IDX_P       = -1.0;             // the radial power-law index of the gas surface density profile
 const real  IDX_Q       = -0.4;             // the radial power-law index of the gas temperature profile (vertically isothermal)
 
-#if defined(DIFFUSION) || defined(COLLISION)
+#if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
 #ifndef CONST_NU
 const real  ALPHA       = 1.0e-02;          // the Shakura-Sunayev viscosity parameter of the gas
-#else
+#else  // CONST_NU
 const real  NU          = 1.0e-04;          // the kinematic viscosity parameter of the gas
-#endif // CONST_NU
-#endif // DIFFUSION or COLLISION
+#endif // NOT CONST_NU
+#endif // COLLISION or DIFFUSION
 
 #ifdef COLLISION
 #ifndef CODE_UNIT
 const real  M_MOL       = 2.3*1.66054e-24;  // mean molecular weight of the gas in grams
 const real  X_SEC       = 2.0e-15;          // the cross section of H2 gas in cm^2
-#else
+#else  // CODE_UNIT
 const real  RE_0        = 1.0e+08;          // reference Reynolds number at R_0
-#endif // CODE_UNIT
+#endif // NOT CODE_UNIT
 #endif // COLLISION
 
 // =========================================================================================================================
@@ -75,13 +75,16 @@ const real  ST_0        = 1.0e-01;          // the reference Stokes number of du
 const real  M_D         = 1.0e30;           // the total dust mass in the disk, decoupled from M_S for flexibility
 const real  RHO_0       = 1.0;              // the reference internal density of the dust
 
-#ifdef RADIATION
+#if defined(TRANSPORT) && defined(RADIATION)
 const real  BETA_0      = 1.0e+01;          // the reference ratio between the radiation pressure and the gravity
 const real  KAPPA_0     = 3.0e-28;          // the reference gray opacity of the dust
 #endif // RADIATION
 
-#if defined(DIFFUSION) || defined(COLLISION)
+#if defined(TRANSPORT) && defined(DIFFUSION)
 const real  SC_R        = 1.0e+10;          // the Schmidt number for radial   diffusion
+#endif // DIFFUSION
+
+#if (defined(TRANSPORT) && defined(DIFFUSION)) || defined(COLLISION)
 const real  SC_Z        = 1.0;              // the Schmidt number for vertical diffusion
 #endif // DIFFUSION or COLLISION
 
@@ -111,16 +114,21 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const real DT_OUT       = 0.1;
-const real DT_DYN       = 0.1;
-
 const int  SAVE_MAX     = 20;              // total number of outputs for mesh fields
+
+const real DT_OUT       = 0.1;
+
+#ifdef TRANSPORT
+const real DT_DYN       = 0.1;
+#endif // TRANSPORT
 
 #ifdef LOGOUTPUT
 const int  LOG_BASE     = 2;               // save particle data at t = DT_OUT*LOG_BASE^N, N = 0, 1, 2, ...
-#else // Linear output
+#else  // LINEAR
 const int  LIN_BASE     = 1;                // save particle data at t = DT_OUT*LIN_BASE*N, N = 0, 1, 2, ...
 #endif // LOGOUTPUT
+
+const real DT_MIN       = 1.0e-14;         // calculation steps with smaller dt will be skipped
 
 const std::string PATH_OUT = "./out/";
 
@@ -178,4 +186,4 @@ const int NB_Y = NG_XZ / THREADS_PER_BLOCK + 1; // number of blocks for Y-direct
 
 // =========================================================================================================================
 
-#endif // CONST_CUH
+#endif // NOT CONST_CUH

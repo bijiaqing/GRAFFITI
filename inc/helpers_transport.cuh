@@ -129,4 +129,6 @@ void _ssa_substep_2 (real dt, real size, real beta, real lx_i, real vy_i, real l
     x_j = x_1 + 0.5*lx_j*dt / y_1 / y_j / sin(z_1) / sin(z_j);
 }
 
-#endif // HELPERS_TRANSPORT_CUH
+// =========================================================================================================================
+
+#endif // NOT HELPERS_TRANSPORT_CUH

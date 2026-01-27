@@ -259,4 +259,6 @@ void _particle_to_grid_core(real *dev_grid, const swarm *dev_particle, int idx)
     atomicAdd(&dev_grid[idx_cell + next_x + next_y + next_z],        frac_x *       frac_y *       frac_z *weight);
 }
 
-#endif // HELPERS_GRIDFIELD_CUH
+// =========================================================================================================================
+
+#endif // NOT HELPERS_GRIDFIELD_CUH

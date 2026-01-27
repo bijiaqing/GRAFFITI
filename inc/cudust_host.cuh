@@ -273,20 +273,20 @@ bool save_variable (const std::string &file_name)
     file << "ASPR_0      = " << std::defaultfloat   << std::setprecision(8) << ASPR_0       << std::endl;
     file << "IDX_P       = " << std::defaultfloat   << std::setprecision(8) << IDX_P        << std::endl;
     file << "IDX_Q       = " << std::defaultfloat   << std::setprecision(8) << IDX_Q        << std::endl;
-    #if defined(DIFFUSION) || defined(COLLISION)
+    #if (defined(TRANSPORT) && defined(DIFFUSION)) || defined(COLLISION)
     #ifndef CONST_NU
     file << "ALPHA       = " << std::scientific     << std::setprecision(8) << ALPHA        << std::endl;
-    #else
+    #else  // CONST_NU
     file << "NU          = " << std::scientific     << std::setprecision(8) << NU           << std::endl;
-    #endif // CONST_NU
+    #endif // NOT CONST_NU
     #endif // DIFFUSION or COLLISION
     #ifdef COLLISION
     #ifndef CODE_UNIT
     file << "M_MOL       = " << std::scientific     << std::setprecision(8) << M_MOL        << std::endl;
     file << "X_SEC       = " << std::scientific     << std::setprecision(8) << X_SEC        << std::endl;
-    #else
+    #else  // CODE_UNIT
     file << "RE_0        = " << std::scientific     << std::setprecision(8) << RE_0         << std::endl;
-    #endif // CODE_UNIT
+    #endif // NOT CODE_UNIT
     #endif // COLLISION
     file                                                                                    << std::endl;
     
@@ -294,19 +294,22 @@ bool save_variable (const std::string &file_name)
     file << "ST_0        = " << std::scientific     << std::setprecision(8) << ST_0         << std::endl;
     file << "M_D         = " << std::scientific     << std::setprecision(8) << M_D          << std::endl;
     file << "RHO_0       = " << std::scientific     << std::setprecision(8) << RHO_0        << std::endl;
-    #ifdef RADIATION
+    #if (defined(TRANSPORT) && defined(RADIATION))
     file << "BETA_0      = " << std::scientific     << std::setprecision(8) << BETA_0       << std::endl;
     file << "KAPPA_0     = " << std::scientific     << std::setprecision(8) << KAPPA_0      << std::endl;
     #endif // RADIATION
-    #if defined(DIFFUSION) || defined(COLLISION)
+    #if (defined(TRANSPORT) && defined(DIFFUSION))
     file << "SC_R        = " << std::scientific     << std::setprecision(8) << SC_R         << std::endl;
+    #endif // DIFFUSION
+    #if (defined(TRANSPORT) && defined(DIFFUSION)) || defined(COLLISION)
     file << "SC_Z        = " << std::scientific     << std::setprecision(8) << SC_Z         << std::endl;
     #endif // DIFFUSION or COLLISION
+
     #ifdef COLLISION
     file << "LAMBDA_0    = " << std::scientific     << std::setprecision(8) << LAMBDA_0     << std::endl;
     file << "V_FRAG      = " << std::scientific     << std::setprecision(8) << V_FRAG       << std::endl;
-    file << "COAG_KERNEL      = " << std::defaultfloat   << std::setprecision(8) << COAG_KERNEL       << std::endl;
-    file << "N_K    = " << std::defaultfloat   << std::setprecision(8) << N_K     << std::endl;
+    file << "COAG_KERNEL = " << std::defaultfloat   << std::setprecision(8) << COAG_KERNEL  << std::endl;
+    file << "N_K         = " << std::defaultfloat   << std::setprecision(8) << N_K          << std::endl;
     #endif // COLLISION
     file                                                                                    << std::endl;
 
@@ -341,15 +344,18 @@ bool save_variable (const std::string &file_name)
     file << "SAVE_MAX    = " << std::defaultfloat   << std::setprecision(8) << SAVE_MAX     << std::endl;
     #ifdef LOGOUTPUT
     file << "LOG_BASE    = " << std::defaultfloat   << std::setprecision(8) << LOG_BASE     << std::endl;
-    #else
+    #else  // LINEAR
     file << "LIN_BASE    = " << std::defaultfloat   << std::setprecision(8) << LIN_BASE     << std::endl;
     #endif // LOGOUTPUT
     file << "DT_OUT      = " << std::scientific     << std::setprecision(8) << DT_OUT       << std::endl;
+    #ifdef TRANSPORT
     file << "DT_DYN      = " << std::scientific     << std::setprecision(8) << DT_DYN       << std::endl;
+    #endif // TRANSPORT
+    file << "DT_MIN      = " << std::scientific     << std::setprecision(8) << DT_MIN       << std::endl;
     file << "PATH_OUT    = "                                                << PATH_OUT     << std::endl;
     file                                                                                    << std::endl;
 
-    // Swarm structure as numpy dtype (configparser-compatible)
+    // Swarm structure as numpy dtype (configparser-compatible), in python, write as:
     // dtype = np.dtype([(name, dtype) for name, dtype in config['SWARM_DTYPE'].items()])
     file << "[SWARM_DTYPE]"                                                                 << std::endl;
     file << "position_x = f8"                                                               << std::endl;
@@ -362,9 +368,76 @@ bool save_variable (const std::string &file_name)
     file << "par_numr   = f8"                                                               << std::endl;
     #ifdef COLLISION
     file << "col_rate   = f8"                                                               << std::endl;
+    file << "max_dist   = f8"                                                               << std::endl;
     #endif // COLLISION
     
     return file.good();
 }
 
-#endif // CUDUST_HOST_CUH
+// =========================================================================================================================
+// Console output macros (access local variables directly, no parameters needed)
+// =========================================================================================================================
+
+#ifdef TRANSPORT
+#define PRINT_TITLE_TRANSPORT()             \
+std::cout                                   \
+<< std::setw(10) << "count_dyn" << " "      \
+<< std::setw(10) << "dt_dyn"    << " ";
+#define PRINT_VALUE_TRANSPORT()             \
+std::cout                                   \
+<< std::defaultfloat                        \
+<< std::setw(10) << count_dyn   << " "      \
+<< std::scientific << std::setprecision(3)  \
+<< std::setw(10) << dt_dyn      << " ";
+#else // NO TRANSPORT
+#define PRINT_TITLE_TRANSPORT()
+#define PRINT_VALUE_TRANSPORT()
+#endif // TRANSPORT
+
+#ifdef COLLISION
+#define PRINT_TITLE_COLLISION()             \
+std::cout                                   \
+#ifdef TRANSPORT
+<< std::setw(10) << "clock_dyn" << " "      \
+#endif // TRANSPORT
+<< std::setw(10) << "count_col" << " "      \
+<< std::setw(10) << "dt_col"    << " ";
+#define PRINT_VALUE_COLLISION()             \
+std::cout                                   \
+#ifdef TRANSPORT
+<< std::scientific << std::setprecision(3)  \
+<< std::setw(10) << clock_dyn   << " "      \
+#endif // TRANSPORT
+<< std::defaultfloat                        \
+<< std::setw(10) << count_col   << " "      \
+<< std::scientific << std::setprecision(3)  \
+<< std::setw(10) << dt_col      << " ";
+#else  // NO COLLISION
+#define PRINT_TITLE_COLLISION()
+#define PRINT_VALUE_COLLISION()
+#endif // COLLISION
+
+#define PRINT_TITLE_TO_SCREEN()             \
+std::cout << std::setfill(' ')              \
+<< std::setw(5)  << "idx"       << " "      \
+<< std::setw(10) << "clock_sim" << " "      \
+<< std::setw(10) << "clock_out" << " ";     \
+PRINT_TITLE_TRANSPORT();                    \
+PRINT_TITLE_COLLISION();                    \
+std::cout << std::endl;
+
+#define PRINT_VALUE_TO_SCREEN()             \
+std::cout << std::setfill(' ')              \
+<< std::defaultfloat                        \
+<< std::setw(5)  << idx_file    << " "      \
+<< std::scientific << std::setprecision(3)  \
+<< std::setw(10) << clock_sim   << " "      \
+<< std::scientific << std::setprecision(3)  \
+<< std::setw(10) << clock_out   << " ";     \
+PRINT_VALUE_TRANSPORT();                    \
+PRINT_VALUE_COLLISION();                    \
+std::cout << std::endl;
+
+// =========================================================================================================================
+
+#endif // NOT CUDUST_HOST_CUH

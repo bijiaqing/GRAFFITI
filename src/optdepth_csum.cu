@@ -1,4 +1,4 @@
-#ifdef RADIATION
+#if defined(TRANSPORT) && defined(RADIATION)
 
 #include "cudust_kern.cuh"
 
@@ -29,5 +29,7 @@ void optdepth_csum (real *dev_optdepth) // cumulative sum in the radial directio
         }
     }
 }
+
+// =========================================================================================================================
 
 #endif // RADIATION

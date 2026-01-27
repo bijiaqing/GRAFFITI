@@ -21,4 +21,6 @@ void col_rate_init (real *dev_col_rate, real *dev_col_expt, real *dev_col_rand)
     }
 }
 
+// =========================================================================================================================
+
 #endif // COLLISION

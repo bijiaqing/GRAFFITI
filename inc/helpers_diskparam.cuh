@@ -44,11 +44,11 @@ real _get_nu (real R, real h)
     {
         nu = ALPHA*h*h*R*R*_get_omegaK(R);
     }
-    #else
+    #else  // CONST_NU
     {
         nu = NU;
     }
-    #endif // CONST_NU
+    #endif // NOT CONST_NU
     
     return nu;
 }
@@ -72,11 +72,11 @@ real _get_alpha (real R, real h)
     {
         alpha = ALPHA;
     }
-    #else
+    #else  // CONST_NU
     {
         alpha = NU / (h*h*R*R*_get_omegaK(R));
     }
-    #endif // CONST_NU
+    #endif // NOT CONST_NU
 
     return alpha;
 }
@@ -106,7 +106,7 @@ real _get_St (real R, real Z, real s, real h)
         St /= pow(R / R_0, IDX_P);          // scale with radial   profile for gas density and sound speed
         St /= exp(-Z*Z / (2.0*h*h*R*R));    // scale with vertical profile for gas density
     }
-    #endif // CONST_ST
+    #endif // NOT CONST_ST
 
     return St;
 }
@@ -168,4 +168,6 @@ real _get_grid_volume (int idx, real *y0_ptr = nullptr, real *dy_ptr = nullptr)
     return vol_x*vol_y*vol_z;
 }
 
-#endif // HELPERS_DISKPARAM_CUH
+// =========================================================================================================================
+
+#endif // NOT HELPERS_DISKPARAM_CUH

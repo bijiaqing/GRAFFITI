@@ -11,7 +11,7 @@
 
 __global__
 void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt, 
-    const real *dev_col_rand, const int *dev_col_flag, const tree *dev_treenode, const bbox *dev_boundbox)
+    const real *dev_col_rand, const int *dev_col_flag, const tree *dev_col_tree, const bbox *dev_boundbox)
 {
     // calculates the outcome of collision and update the property of the particle
     // if the collision flag of the cell that the particle is in is 1, it examines whether the particle is going to collide
@@ -21,7 +21,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
 
     if (idx_tree < N_PAR)
     {
-        int idx_old_i = dev_treenode[idx_tree].index_old;
+        int idx_old_i = dev_col_tree[idx_tree].index_old;
 
         real loc_x = _get_loc_x(dev_particle[idx_old_i].position.x);
         real loc_y = _get_loc_y(dev_particle[idx_old_i].position.y);
@@ -60,7 +60,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             
             candidatelist query_result(max_search_dist);
             cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
-                dev_treenode[idx_tree].cartesian, *dev_boundbox, dev_treenode, N_PAR);
+                dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_PAR);
 
             int idx_old_j, idx_query, j = 0;
 
@@ -80,7 +80,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
 
                 if (idx_query != -1)
                 {   
-                    idx_old_j = dev_treenode[idx_query].index_old;
+                    idx_old_j = dev_col_tree[idx_query].index_old;
                     col_expt_ij += _get_col_rate_ij<static_cast<KernelType>(COAG_KERNEL)>(dev_particle, idx_old_i, idx_old_j) / volume;
                 }
 
@@ -131,5 +131,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
         }
     }
 }
+
+// =================================================================================================================================
 
 #endif // COLLISION

@@ -1,4 +1,4 @@
-#ifdef RADIATION
+#if defined(TRANSPORT) && defined(RADIATION)
 
 #include "cudust_kern.cuh"
 #include "helpers_transport.cuh"
@@ -27,5 +27,7 @@ void ssa_substep_1 (swarm *dev_particle, real dt)
         _save_particle(dev_particle, idx, x_1, y_1, z_1, lx_i, vy_i, lz_i);
     }
 }
+
+// =========================================================================================================================
 
 #endif // RADIATION

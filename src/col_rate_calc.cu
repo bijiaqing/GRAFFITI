@@ -10,7 +10,7 @@
 // =========================================================================================================================
 
 __global__
-void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_treenode, const bbox *dev_boundbox)
+void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col_tree, const bbox *dev_boundbox)
 {
     // calculates the total collision rate for each cell, to help determine whether a collision is going to happen in the cell
     // it goes through each particle (i) and calculates the colision rate of it, then adds the rate to the corresponding cell
@@ -19,7 +19,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
 
     if (idx_tree < N_PAR)
     {
-        int idx_old_i = dev_treenode[idx_tree].index_old;
+        int idx_old_i = dev_col_tree[idx_tree].index_old;
         
         real loc_x = _get_loc_x(dev_particle[idx_old_i].position.x);
         real loc_y = _get_loc_y(dev_particle[idx_old_i].position.y);
@@ -39,7 +39,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
         
         candidatelist query_result(max_search_dist);
         cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
-            dev_treenode[idx_tree].cartesian, *dev_boundbox, dev_treenode, N_PAR);
+            dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_PAR);
 
         real col_rate_ij = 0.0; // collision rate between particle i and j
         real col_rate_i  = 0.0; // total collision rate for particle i
@@ -59,7 +59,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
                 dist2 = query_result.returnDist2(j);
                 max_dist2 = fmaxf(max_dist2, dist2);
                 
-                idx_old_j = dev_treenode[idx_query].index_old;
+                idx_old_j = dev_col_tree[idx_query].index_old;
                 col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(COAG_KERNEL)> (dev_particle, idx_old_i, idx_old_j);
             }
 
@@ -78,5 +78,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
         atomicAdd(&dev_col_rate[idx_cell], col_rate_i);
     }
 }
+
+// =================================================================================================================================
 
 #endif // COLLISION

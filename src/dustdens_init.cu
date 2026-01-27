@@ -1,4 +1,4 @@
-
+#ifdef SAVE_DENS
 
 #include "cudust_kern.cuh"
 
@@ -18,3 +18,7 @@ void dustdens_init (real *dev_dustdens)
         dev_dustdens[idx] = 0.0;
     }
 }
+
+// =========================================================================================================================
+
+#endif // SAVE_DENS

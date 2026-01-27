@@ -67,7 +67,7 @@ real _get_vrel_b (real polar_R, real s_i, real s_j, real h_gas)
     return min(vrel_b, c_s);
 }
 
-#endif // CODE_UNIT
+#endif // NOT CODE_UNIT
 
 __device__ __forceinline__
 real _get_ReInvSqrt (real polar_R, real alpha)
@@ -75,16 +75,16 @@ real _get_ReInvSqrt (real polar_R, real alpha)
     real Re = 1.0;
     real sigma = _get_sigma_gas(polar_R);
     
-    #ifndef CODE_UNIT // using physical unit
+    #ifndef CODE_UNIT
     {
         Re = 0.5*alpha*sigma*X_SEC / M_MOL;
     }
-    #else // using code unit
+    #else  // CODE_UNIT
     {
         real alpha_0 = _get_alpha(R_0, ASPR_0);
         Re = RE_0*(alpha / alpha_0)*(sigma / SIGMA_0);
     }
-    #endif // CODE_UNIT
+    #endif // NOT CODE_UNIT
 
     return 1.0 / sqrt(Re);
 }
@@ -253,12 +253,12 @@ real _get_vrel (const swarm *dev_particle, int idx_old_i, int idx_old_j)
     // brownian motion will not be considered when code units are used
     // for turbulent motion, Reynolds number will be prescribed when code units are used
 
-    #ifndef CODE_UNIT // using physical unit
+    #ifndef CODE_UNIT
     {
         real vrel_b = _get_vrel_b(polar_R, size_i, size_j, h_gas);
         vrel_sq += vrel_b*vrel_b; // Brownian motion
     }
-    #endif // CODE_UNIT
+    #endif // NOT CODE_UNIT
 
     real vrel_t = _get_vrel_t(polar_R, St_i, St_j, h_gas);
     vrel_sq += vrel_t*vrel_t; // turbulence
@@ -340,4 +340,6 @@ real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j)
 
 #endif // COLLISION
 
-#endif // HELPERS_COLLISION_CUH
+// =========================================================================================================================
+
+#endif // NOT HELPERS_COLLISION_CUH

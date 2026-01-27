@@ -1,4 +1,4 @@
-#ifdef RADIATION
+#if defined(TRANSPORT) && defined(RADIATION)
 
 #include "cudust_kern.cuh"
 #include "helpers_gridfield.cuh"
@@ -19,5 +19,7 @@ void optdepth_scat (real *dev_optdepth, const swarm *dev_particle)
         _particle_to_grid_core <OPTDEPTH> (dev_optdepth, dev_particle, idx);
     }
 }
+
+// =========================================================================================================================
 
 #endif // RADIATION

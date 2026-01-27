@@ -19,15 +19,17 @@ std::mt19937 rand_generator;
 int main (int argc, char **argv)
 {
     int idx_resume;
-    real timer_sim = 0.0;   // total simulation time
+    real clock_sim = 0.0;   // total simulation time
+    real clock_out = 0.0;   // time accumulated toward the next output
 
+    #ifdef TRANSPORT
     int count_dyn;          // how many dynamics timesteps in one output timestep
-    real timer_out = 0.0;   // time accumulated toward the next output
     real dt_dyn;            // dynamical timestep
-
+    #endif // TRANSPORT
+    
     #ifdef COLLISION
     int count_col;          // how many collision calculations in one dynamics timestep
-    real timer_dyn = 0.0;   // time accumulated toward the next dynamics timestep
+    real clock_dyn = 0.0;   // time accumulated toward the next dynamics timestep
     real dt_col;            // collisional timestep
     #endif // COLLISION
     
@@ -42,20 +44,20 @@ int main (int argc, char **argv)
     cudaMallocHost((void**)&dustdens, sizeof(real)*N_GRD);
     cudaMalloc((void**)&dev_dustdens, sizeof(real)*N_GRD);
 
-    #ifdef RADIATION
+    #if defined(TRANSPORT) && defined(RADIATION)
     real *optdepth, *dev_optdepth;
     cudaMallocHost((void**)&optdepth, sizeof(real)*N_GRD);
     cudaMalloc((void**)&dev_optdepth, sizeof(real)*N_GRD);
     #endif // RADIATION
 
     #ifdef COLLISION
-    real max_rate; // Simple variable for max collision rate (Thrust approach)
+    real max_rate; // Simple variable for max collision rate (thrust approach)
 
     bbox *dev_boundbox;
     cudaMalloc((void**)&dev_boundbox, sizeof(bbox));
 
-    tree *dev_treenode;
-    cudaMalloc((void**)&dev_treenode, sizeof(tree)*N_PAR);
+    tree *dev_col_tree;
+    cudaMalloc((void**)&dev_col_tree, sizeof(tree)*N_PAR);
 
     curs *dev_rs_grids;
     cudaMalloc((void**)&dev_rs_grids, sizeof(curs)*N_GRD);
@@ -71,7 +73,7 @@ int main (int argc, char **argv)
     cudaMalloc((void**)&dev_col_flag, sizeof(int) *N_GRD);
     #endif // COLLISION
 
-    #if defined(COLLISION) || defined(DIFFUSION)
+    #if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
     curs *dev_rs_swarm;
     cudaMalloc((void**)&dev_rs_swarm, sizeof(curs)*N_PAR);
     #endif // COLLISION or DIFFUSION
@@ -101,7 +103,8 @@ int main (int argc, char **argv)
         real idx_rho_g = IDX_P - 0.5*IDX_Q - 1.5;   // volumetric gas density power-law index
         real idx_swarm = -0.5;                      // all swarms have an equal mass
 
-        #ifdef RADIATION // all swarms have an equal surface area, see _get_grain_number in initialize.cu
+        #ifdef defined(TRANSPORT) && defined(RADIATION)
+        // all swarms have an equal surface area, see _get_grain_number in initialize.cu
         idx_swarm = -1.5; 
         #endif // RADIATION
 
@@ -124,7 +127,7 @@ int main (int argc, char **argv)
         cudaFreeHost(random_z); cudaFree(dev_random_z);
         cudaFreeHost(random_s); cudaFree(dev_random_s);
         
-        #if defined(COLLISION) || defined(DIFFUSION)
+        #if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
         rs_swarm_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rs_swarm);
         #endif // COLLISION or DIFFUSION
         
@@ -133,28 +136,27 @@ int main (int argc, char **argv)
         #endif // COLLISION
 
         mkdir(PATH_OUT.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-
         save_variable(PATH_OUT + "variables.txt");
 
-        #ifdef RADIATION
+        #if defined(TRANSPORT) && defined(RADIATION)
         optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);                   // set all optical depth data to zero
         optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);     // add particle contribution to cells
         optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);                   // calculate the optical thickness of each cell
         optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);                   // integrate in Y direction to get optical depth
         optdepth_mean <<< NB_X, THREADS_PER_BLOCK >>> (dev_optdepth);                   // do azimuthal averaging for initial condition
-        
         cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
         fname = PATH_OUT + "optdepth_" + frame_num(idx_resume) + ".dat";
         save_binary(fname, optdepth, N_GRD);
         #endif // RADIATION
 
-        // dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // this process cannot be merged with the above
-        // dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
-        // dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // of each particle may differ
-
-        // cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        // fname = PATH_OUT + "dustdens_" + frame_num(idx_resume) + ".dat";
-        // save_binary(fname, dustdens, N_GRD);
+        #ifdef SAVE_DENS
+        dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // this process cannot be merged with the above
+        dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
+        dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // of each particle may differ
+        cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
+        fname = PATH_OUT + "dustdens_" + frame_num(idx_resume) + ".dat";
+        save_binary(fname, dustdens, N_GRD);
+        #endif // SAVE_DENS
 
         cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
         fname = PATH_OUT + "particle_" + frame_num(idx_resume) + ".dat";
@@ -179,7 +181,7 @@ int main (int argc, char **argv)
         }
         cudaMemcpy(dev_particle, particle, sizeof(swarm)*N_PAR,  cudaMemcpyHostToDevice);
 
-        #if defined(COLLISION) || defined(DIFFUSION)
+        #if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
         rs_swarm_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rs_swarm);
         #endif // COLLISION or DIFFUSION
         
@@ -190,145 +192,155 @@ int main (int argc, char **argv)
         msg_output(idx_resume);
     }
 
-    for (int idx_file = 1 + idx_resume; idx_file <= SAVE_MAX; idx_file++)    // main evolution loop
+    #if defined(COLLISION) && !defined(TRANSPORT) // only need to build KD-tree once and can use it forever
+    col_tree_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_col_tree, dev_particle);
+    cukd::buildTree <tree, tree_traits> (dev_col_tree, N_PAR, dev_boundbox);
+    #endif // COLLISION but NO TRANSPORT
+
+    #if !defined(TRANSPORT) && !defined(COLLISION)
+    std::cerr << "Error: No evolution module is enabled. Please enable TRANSPORT and/or COLLISION." << std::endl;
+    return 1;
+    #endif // NO TRANSPORT and NO COLLISION
+
+    for (int idx_file = 1 + idx_resume; idx_file <= SAVE_MAX; idx_file++) // main evolution loop
     {
-        timer_out = 0.0;
-        count_dyn = 0;
+        clock_out = 0.0; // reset output clock
+        
+        #ifdef TRANSPORT
+        count_dyn = 0; // reset dynamical step counter
+        #endif // TRANSPORT
 
-        std::cout << std::setfill(' ')
-            << std::setw(10) << "idx_file"  << " "
-            << std::setw(10) << "timer_sim" << " "
-            << std::setw(10) << "count_dyn" << " "
-            << std::setw(10) << "timer_out" << " "
-            << std::setw(10) << "dt_dyn"    << " "
-            #ifdef COLLISION
-            << std::setw(10) << "count_col" << " "
-            << std::setw(10) << "timer_dyn" << " "
-            << std::setw(10) << "dt_col"    << " "
-            #endif // COLLISION
-            << std::endl;
-
-        while (timer_out < DT_OUT) // evolve particle until one output timestep
+        PRINT_TITLE_TO_SCREEN();
+        
+        do // begin of while (clock_out < DT_OUT)
         {
-            // Compute dynamics timestep: min of DT_DYN and remaining time to file save
-            dt_dyn = fmin(DT_DYN, DT_OUT - timer_out);
+            #ifdef TRANSPORT
+            dt_dyn = fmin(DT_DYN, DT_OUT - clock_out);
+            
+            if (dt_dyn < DT_MIN)
+            {
+                break; // jump to file save if dt_dyn is too small
+            }
+
+            #ifdef RADIATION
+            ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
+            optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+            optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
+            optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+            optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
+            ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
+            #else  // NO RADIATION
+            ssa_transport <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
+            #endif // RADIATION
+            
+            #ifdef DIFFUSION
+            diffusion_pos <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dt_dyn);
+            #endif // DIFFUSION
+
+            cudaDeviceSynchronize();
+
+            #ifndef COLLISION // only update simulation clock here if NO COLLISION
+            clock_sim += dt_dyn;
+            #endif // NO COLLISION
+
+            clock_out += dt_dyn;
+            count_dyn ++;
+
+            PRINT_VALUE_TO_SCREEN();
+            #endif // TRANSPORT
             
             #ifdef COLLISION
-            timer_dyn = 0.0;
             count_col = 0;
-            
-            treenode_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_treenode, dev_particle);
-            cukd::buildTree <tree, tree_traits> (dev_treenode, N_PAR, dev_boundbox);
 
-            while (timer_dyn < dt_dyn)
+            #ifdef TRANSPORT
+            clock_dyn = 0.0;
+            
+            // need to rebuild KD-tree for every dynamical timestep
+            col_tree_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_col_tree, dev_particle);
+            cukd::buildTree <tree, tree_traits> (dev_col_tree, N_PAR, dev_boundbox);
+            #endif // TRANSPORT
+        
+            do // begin of while (clock_dyn < dt_dyn) or while (clock_out < DT_OUT)
             {
                 col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_expt, dev_col_rand);
-                col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_col_rate, dev_particle, dev_treenode, dev_boundbox);
+                col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_col_rate, dev_particle, dev_col_tree, dev_boundbox);
                 
-                // use thrust to find maximum collision rate
-                thrust::device_ptr <const real> dev_ptr (dev_col_rate);
-                thrust::device_ptr <const real> max_ptr = thrust::max_element (dev_ptr, dev_ptr + N_GRD);
-                max_rate = *max_ptr; // Dereference triggers single-value cudaMemcpy from device to host
+                // use thrust to find maximum collision rate on device
+                thrust::device_ptr <const real> dev_ptr(dev_col_rate);
+                thrust::device_ptr <const real> max_ptr = thrust::max_element(dev_ptr, dev_ptr + N_GRD);
+                max_rate = *max_ptr; // dereference triggers single-value cudaMemcpy from device to host
                 
                 // Compute collisional timestep
                 dt_col = 1.0 / max_rate;
+
+                if (dt_col < DT_MIN)
+                {
+                    std::cerr << "Error: Minimum collisional timestep reached due to high collision rate." << std::endl;
+                    return 1;
+                }
                 
-                // Use minimum of all constraints
-                dt_col = fmin(dt_col, dt_dyn);
-                dt_col = fmin(dt_col, dt_dyn - timer_dyn);
+                #ifdef TRANSPORT
+                dt_col = fmin(dt_col, dt_dyn - clock_dyn);
+                #else  // NO TRANSPORT
+                dt_col = fmin(dt_col, DT_OUT - clock_out);
+                #endif // TRANSPORT
+
+                if (dt_col < DT_MIN)
+                {
+                    break; // jump to transport, or file save, if dt_col is too small
+                }
 
                 col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_flag, dev_rs_grids, dev_col_rand, dev_col_rate, dt_col);
-                col_proc_exec <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dev_col_expt, dev_col_rand, dev_col_flag, dev_treenode, dev_boundbox);
+                col_proc_exec <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dev_col_expt, dev_col_rand, dev_col_flag, dev_col_tree, dev_boundbox);
 
                 cudaDeviceSynchronize();
 
-                timer_dyn += dt_col;
+                #ifdef TRANSPORT
+                clock_dyn += dt_col;
+                #else  // NO TRANSPORT
+                clock_out += dt_col;
+                #endif // TRANSPORT
+                
+                clock_sim += dt_col;
                 count_col ++;
 
-                std::cout 
-                    << std::setfill(' ')
-                    << std::defaultfloat
-                    << std::setw(10) << idx_file    << " "
-                    << std::scientific << std::setprecision(3)
-                    << std::setw(10) << timer_sim   << " "
-                    << std::defaultfloat
-                    << std::setw(10) << count_dyn   << " "
-                    << std::scientific << std::setprecision(3)
-                    << std::setw(10) << timer_out   << " "
-                    << std::setw(10) << dt_dyn      << " "
-                    #ifdef COLLISION
-                    << std::defaultfloat
-                    << std::setw(10) << count_col   << " "
-                    << std::scientific << std::setprecision(3)
-                    << std::setw(10) << timer_dyn   << " "
-                    << std::setw(10) << dt_col      << " "
-                    #endif // COLLISION
-                    << std::endl;
+                PRINT_VALUE_TO_SCREEN();
             }
+            #ifdef TRANSPORT
+            while (clock_dyn < dt_dyn);
+            #else  // NO TRANSPORT
+            while (clock_out < DT_OUT);
+            #endif // TRANSPORT
             #endif // COLLISION
 
-            // #ifdef RADIATION
-            // ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
-            // optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-            // optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
-            // optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-            // optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
-            // ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
-            // #else
-            // ssa_transport <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
-            // #endif // RADIATION
-            
-            // #ifdef DIFFUSION
-            // diffusion_pos <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dt_dyn);
-            // #endif // DIFFUSION
+            // prevent infinite loop when COLLISION but NO TRANSPORT
+            #if defined(COLLISION) && !defined(TRANSPORT)
+            if (DT_OUT - clock_out < DT_MIN) 
+            {
+                break; // jump to file save if remaining time is too small
+            }
+            #endif // COLLISION but NO TRANSPORT
 
-            // cudaDeviceSynchronize();
+        } while (clock_out < DT_OUT)
 
-            timer_sim += dt_dyn;
-            timer_out += dt_dyn;
-
-            count_dyn ++;
-
-            std::cout 
-                << std::setfill(' ')
-                << std::defaultfloat
-                << std::setw(10) << idx_file    << " "
-                << std::scientific << std::setprecision(3)
-                << std::setw(10) << timer_sim   << " "
-                << std::defaultfloat
-                << std::setw(10) << count_dyn   << " "
-                << std::scientific << std::setprecision(3)
-                << std::setw(10) << timer_out   << " "
-                << std::setw(10) << dt_dyn      << " "
-                #ifdef COLLISION
-                << std::defaultfloat
-                << std::setw(10) << count_col   << " "
-                << std::scientific << std::setprecision(3)
-                << std::setw(10) << timer_dyn   << " "
-                << std::setw(10) << dt_col      << " "
-                #endif // COLLISION
-                << std::endl;
-        }   
-    
-        // // calculate dustdens grids for each output
-        // dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
-        // dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);
-        // dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
-
-        // cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        // fname = PATH_OUT + "dustdens_" + frame_num(idx_file) + ".dat";
-        // save_binary(fname, dustdens, N_GRD);
-
-        #ifdef RADIATION
+        #if defined(TRANSPORT) && defined(RADIATION)
         optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
         optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
         optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
         optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
-
         cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
         fname = PATH_OUT + "optdepth_" + frame_num(idx_file) + ".dat";
         save_binary(fname, optdepth, N_GRD);
         #endif // RADIATION
+    
+        #ifdef SAVE_DENS
+        dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
+        dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);
+        dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
+        cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
+        fname = PATH_OUT + "dustdens_" + frame_num(idx_file) + ".dat";
+        save_binary(fname, dustdens, N_GRD);
+        #endif // SAVE_DENS
 
         #ifdef LOGOUTPUT
         if (is_log_power(idx_file))
@@ -337,7 +349,7 @@ int main (int argc, char **argv)
             fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
             save_binary(fname, particle, N_PAR);
         }
-        #else // Linear output
+        #else  // LINEAR
         if (idx_file % LIN_BASE == 0)
         {
             cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
@@ -351,3 +363,5 @@ int main (int argc, char **argv)
  
     return 0;
 }
+
+// =========================================================================================================================

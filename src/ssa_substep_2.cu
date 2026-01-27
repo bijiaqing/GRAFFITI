@@ -1,4 +1,4 @@
-#ifdef RADIATION
+#if defined(TRANSPORT) && defined(RADIATION)
 
 #include <cfloat>                // for DBL_MAX
 
@@ -77,5 +77,7 @@ void ssa_substep_2 (swarm *dev_particle, const real *dev_optdepth, real dt)
         _save_particle(dev_particle, idx, x_j, y_j, z_j, lx_j, vy_j, lz_j);
     }
 }
+
+// ========================================================================================================================
 
 #endif // RADIATION

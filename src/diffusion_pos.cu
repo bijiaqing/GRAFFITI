@@ -1,4 +1,4 @@
-#ifdef DIFFUSION
+#if defined(TRANSPORT) && defined(DIFFUSION)
 
 #include "cudust_kern.cuh"
 #include "helpers_diskparam.cuh"
@@ -33,14 +33,14 @@ void diffusion_pos (swarm *dev_particle, curs *dev_rs_swarm, real dt)
         real avg_R1 = dt*coeff_R*(IDX_P - 0.5*IDX_Q - 1.5) / polar_R;
         real var_R1 = dt*coeff_R*2.0;
 
-        #ifndef CONST_NU // i.e., constant alpha viscosity
+        #ifndef CONST_NU
         // given nu ~ alpha*H_gas*c_s ~ pow(R, IDX_Q + 1.5), then d(coeff_R)/dR = (IDX_Q + 1.5)*coeff_R / R
         real avg_R2 = dt*coeff_R*(IDX_Q + 1.5) / polar_R;
         real var_R2 = avg_R2*avg_R2;
-        #else
+        #else  // CONST_NU
         real avg_R2 = 0.0;
         real var_R2 = 0.0;
-        #endif // CONST_NU
+        #endif // NOT CONST_NU
 
         curs rs_swarm = dev_rs_swarm[idx]; // use a local state for less global memory traffic 
 
@@ -73,5 +73,7 @@ void diffusion_pos (swarm *dev_particle, curs *dev_rs_swarm, real dt)
         dev_rs_swarm[idx] = rs_swarm; // update the global state, otherwise, always the same number
     }
 }
+
+// =========================================================================================================================
 
 #endif // DIFFUSION

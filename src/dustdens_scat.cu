@@ -1,4 +1,4 @@
-
+#ifdef SAVE_DENS
 
 #include "cudust_kern.cuh"
 #include "helpers_gridfield.cuh"
@@ -19,3 +19,7 @@ void dustdens_scat (real *dev_dustdens, const swarm *dev_particle)
         _particle_to_grid_core <DUSTDENS> (dev_dustdens, dev_particle, idx);
     }
 }
+
+// =========================================================================================================================
+
+#endif // SAVE_DENS

@@ -37,4 +37,6 @@ void col_flag_calc (int *dev_col_flag, curs *dev_rs_grids, real *dev_col_rand, c
     }
 }
 
+// ========================================================================================================================
+
 #endif // COLLISION

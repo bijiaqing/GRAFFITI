@@ -22,7 +22,8 @@ This file provides focused, repo-specific guidance to AI coding agents working o
 - Change target GPU arch: edit `Makefile` `CC` variable to use the appropriate `-arch=sm_XX` for your GPU.
 - Run: `./cuDust` (fresh start) or `./cuDust <frame-number>` to resume from saved particle data (see `src/main.cu` resume logic).
 - Output files are written to `./out/` (default defined by `PATH_OUT` in `inc/const.cuh`).
-- Conditional compilation: use `-DRADIATION`, `-DDIFFUSION`, `-DCOLLISION`, `-DCONST_NU`, `-DCONST_ST`, `-DLOGOUTPUT` flags to enable optional features (see `Makefile`).
+- Conditional compilation: use `-DTRANSPORT`, `-DRADIATION`, `-DDIFFUSION`, `-DCOLLISION`, `-DCONST_NU`, `-DCONST_ST`, `-DLOGOUTPUT` flags to enable optional features (see `Makefile`).
+- **Physics module flags**: `-DTRANSPORT` controls particle movement; when OFF, `-DRADIATION` and `-DDIFFUSION` are inactive regardless of their settings. `-DCOLLISION` is independent and can be ON even when TRANSPORT is OFF. See `.github/transport-flag-implementation.md` for details.
 
 **Project-specific conventions & patterns**
 - Declarations vs implementations: declare kernels in `inc/cudust_kern.cuh`, host helpers in `inc/cudust_host.cuh`, device helpers in `inc/helpers_*.cuh`; implement them in `src/*.cu`. Keep that separation.

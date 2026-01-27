@@ -1,4 +1,4 @@
-#ifdef RADIATION
+#if defined(TRANSPORT) && defined(RADIATION)
 
 #include "cudust_kern.cuh"
 
@@ -39,5 +39,7 @@ void optdepth_mean (real *dev_optdepth)
         }
     }
 }
+
+// =========================================================================================================================
 
 #endif // RADIATION
