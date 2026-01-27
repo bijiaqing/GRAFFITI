@@ -69,23 +69,17 @@ const real  SC_Z        = 1.0;              // the Schmidt number for vertical d
 #endif // DIFFUSION or COLLISION
 
 #ifdef COLLISION
-const real  LAMBDA_0    = 5.0e-26;          // the reference collision rate of the dust
-const real  V_FRAG      = 1.0e-04;          // the fragmentation velocity for dust collision
-
 const int   K_COAG      = 2;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
 const int   KNN_SIZE    = 200;              // the maximum number   for KNN neighbor search 
 
-const float MAX_DIST    = 1.0;              // the maximum distance for KNN neighbor search
+const real  LAMBDA_0    = N_X*N_Y*N_Z/KNN_SIZE;          // the reference collision rate of the dust
+const real  V_FRAG      = 1.0e-04;          // the fragmentation velocity for dust collision
 #endif // COLLISION
 
 // =========================================================================================================================
 // mesh domain size and resolution
 
 const int   N_PAR       = 1e+07;            // total number of super-particles in the model
-
-// const int   N_X         = 1;                // number of grid cells in X direction (azimuth)
-// const real  X_MIN       = +M_PI;            // minimum X boundary (azimuth)
-// const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 
 const int   N_X         = 50;              // number of grid cells in X direction (azimuth)
 const real  X_MIN       = -M_PI;            // minimum X boundary (azimuth)
@@ -94,10 +88,6 @@ const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 const int   N_Y         = 50;              // number of grid cells in Y direction (radius)
 const real  Y_MIN       = 0.5;              // minimum Y boundary (radius)
 const real  Y_MAX       = 1.5;              // maximum Y boundary (radius)
-
-// const int   N_Z         = 1;                // number of grid cells in Z direction (colattitude)
-// const real  Z_MIN       = 0.5*M_PI;         // minimum Z boundary (colattitude)
-// const real  Z_MAX       = 0.5*M_PI;         // maximum Z boundary (colattitude)
 
 const int   N_Z         = 50;              // number of grid cells in Z direction (colattitude)
 const real  Z_MIN       = 0.5*M_PI - 0.2;   // minimum Z boundary (colattitude)
@@ -115,21 +105,14 @@ const real INIT_YMAX    = Y_MAX;            // maximum Y boundary for particle i
 const real INIT_ZMIN    = Z_MIN;            // minimum Z boundary for particle initialization
 const real INIT_ZMAX    = Z_MAX;            // maximum Z boundary for particle initialization
 
-// const real INIT_ZMIN    = 0.5*M_PI;         // minimum Z boundary for particle initialization
-// const real INIT_ZMAX    = 0.5*M_PI;         // maximum Z boundary for particle initialization
-
 const real INIT_SMIN    = 1.0e+00;          // minimum grain size for particle initialization
 const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle initialization
 
 // =========================================================================================================================
 // time step and output parameters
 
-const real DT_OUT       = 0.1;    // 100*2^-7 = 0.78125
-const real DT_DYN       = 0.1;   // 100*2^-12 = 0.0244140625
-
-// const real DT_OUT       = 2.0*M_PI;         // time interval between adjascent outputs
-// const real DT_DYN       = 2.0*M_PI / 10;    // time interval between adjascent outputs
-// const real DT_DYN = 2.0*M_PI/static_cast<real>(N_X);
+const real DT_OUT       = 0.1;
+const real DT_DYN       = 0.1;
 
 const int  SAVE_MAX     = 20;              // total number of outputs for mesh fields
 

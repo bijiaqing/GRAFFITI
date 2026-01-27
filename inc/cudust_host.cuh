@@ -307,7 +307,6 @@ bool save_variable (const std::string &file_name)
     file << "V_FRAG      = " << std::scientific     << std::setprecision(8) << V_FRAG       << std::endl;
     file << "K_COAG      = " << std::defaultfloat   << std::setprecision(8) << K_COAG       << std::endl;
     file << "KNN_SIZE    = " << std::defaultfloat   << std::setprecision(8) << KNN_SIZE     << std::endl;
-    file << "MAX_DIST    = " << std::scientific     << std::setprecision(8) << MAX_DIST     << std::endl;
     #endif // COLLISION
     file                                                                                    << std::endl;
 

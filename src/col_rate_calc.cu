@@ -32,8 +32,12 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
         if (!(in_x && in_y && in_z)) return; // particle is out of bounds, do nothing
 
         int  idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+
+        // maximum search distance for KNN neighbor search defined by gas scale height
+        real polar_R = dev_particle[idx_old_i].position.y*sin(dev_particle[idx_old_i].position.z);
+        float max_search_dist = static_cast<float>(_get_hgas(polar_R)*polar_R);
         
-        candidatelist query_result(MAX_DIST);
+        candidatelist query_result(max_search_dist);
         cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
             dev_treenode[idx_tree].cartesian, *dev_boundbox, dev_treenode, N_PAR);
 
@@ -50,7 +54,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
             col_rate_ij = 0.0;
             idx_query = query_result.returnIndex(j);
 
-            if (idx_query != -1) // if the j-th nearest neighbor exists within MAX_DIST
+            if (idx_query != -1) // if the j-th nearest neighbor exists
             {
                 dist2 = query_result.returnDist2(j);
                 max_dist2 = fmaxf(max_dist2, dist2);

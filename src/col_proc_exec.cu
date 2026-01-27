@@ -53,8 +53,12 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
         if (col_expt < col_rand && col_expt + col_rate_i >= col_rand)   // if this is the particle that is going to collide
         {
             curs rs_swarm = dev_rs_swarm[idx_old_i];
+
+            // maximum search distance for KNN neighbor search defined by gas scale height
+            real polar_R = dev_particle[idx_old_i].position.y*sin(dev_particle[idx_old_i].position.z);
+            float max_search_dist = static_cast<float>(_get_hgas(polar_R)*polar_R);
             
-            candidatelist query_result(MAX_DIST);
+            candidatelist query_result(max_search_dist);
             cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
                 dev_treenode[idx_tree].cartesian, *dev_boundbox, dev_treenode, N_PAR);
 
