@@ -21,16 +21,16 @@ NVCC += --diag-suppress 177,550
 NVCC += -DCODE_UNIT
 
 # LOGOUTPUT: Use logarithmic output intervals
-NVCC += -DLOGOUTPUT
+# NVCC += -DLOGOUTPUT
 
 # RADIATION: Enable radiation pressure calculations (optical depth, beta)
 # NVCC += -DRADIATION
 
 # DIFFUSION: Enable turbulent diffusion of dust particles
-NVCC += -DDIFFUSION
+# NVCC += -DDIFFUSION
 
 # COLLISION: Enable dust collision and coagulation/fragmentation
-# NVCC += -DCOLLISION
+NVCC += -DCOLLISION
 
 # CONST_NU: Use constant kinematic viscosity NU instead of alpha-viscosity
 # NVCC += -DCONST_NU

@@ -106,9 +106,11 @@ int main (int argc, char **argv)
         #endif // RADIATION
 
         rand_uniform(random_x, N_PAR, INIT_XMIN, INIT_XMAX);
-        rand_convpow(random_y, N_PAR, INIT_YMIN, INIT_YMAX, idx_rho_g, 0.05*R_0, N_Y);
+        // rand_convpow(random_y, N_PAR, INIT_YMIN, INIT_YMAX, idx_rho_g, 0.05*R_0, N_Y);
+        rand_uniform(random_y, N_PAR, INIT_YMIN, INIT_YMAX);
         rand_uniform(random_z, N_PAR, INIT_ZMIN, INIT_ZMAX);
         rand_pow_law(random_s, N_PAR, INIT_SMIN, INIT_SMAX, idx_swarm);
+        // rand_4_linear(random_s, N_PAR);
 
         cudaMemcpy(dev_random_x, random_x, sizeof(real)*N_PAR, cudaMemcpyHostToDevice);
         cudaMemcpy(dev_random_y, random_y, sizeof(real)*N_PAR, cudaMemcpyHostToDevice);
@@ -146,13 +148,13 @@ int main (int argc, char **argv)
         save_binary(fname, optdepth, N_GRD);
         #endif // RADIATION
 
-        dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // this process cannot be merged with the above
-        dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
-        dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // of each particle may differ
+        // dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // this process cannot be merged with the above
+        // dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
+        // dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // of each particle may differ
 
-        cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_OUT + "dustdens_" + frame_num(idx_resume) + ".dat";
-        save_binary(fname, dustdens, N_GRD);
+        // cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
+        // fname = PATH_OUT + "dustdens_" + frame_num(idx_resume) + ".dat";
+        // save_binary(fname, dustdens, N_GRD);
 
         cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_PAR, cudaMemcpyDeviceToHost);
         fname = PATH_OUT + "particle_" + frame_num(idx_resume) + ".dat";
@@ -196,12 +198,12 @@ int main (int argc, char **argv)
         std::cout << std::setfill(' ')
             << std::setw(10) << "idx_file"  << " "
             << std::setw(10) << "timer_sim" << " "
-            << std::setw(10) << "timer_out" << " "
             << std::setw(10) << "count_dyn" << " "
+            << std::setw(10) << "timer_out" << " "
             << std::setw(10) << "dt_dyn"    << " "
             #ifdef COLLISION
-            << std::setw(10) << "timer_dyn" << " "
             << std::setw(10) << "count_col" << " "
+            << std::setw(10) << "timer_dyn" << " "
             << std::setw(10) << "dt_col"    << " "
             #endif // COLLISION
             << std::endl;
@@ -254,31 +256,33 @@ int main (int argc, char **argv)
                     << std::scientific << std::setprecision(3)
                     << std::setw(10) << timer_out   << " "
                     << std::setw(10) << dt_dyn      << " "
+                    #ifdef COLLISION
                     << std::defaultfloat
                     << std::setw(10) << count_col   << " "
                     << std::scientific << std::setprecision(3)
                     << std::setw(10) << timer_dyn   << " "
                     << std::setw(10) << dt_col      << " "
+                    #endif // COLLISION
                     << std::endl;
             }
             #endif // COLLISION
 
-            #ifdef RADIATION
-            ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
-            optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-            optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
-            optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-            optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
-            ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
-            #else
-            ssa_transport <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
-            #endif // RADIATION
+            // #ifdef RADIATION
+            // ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
+            // optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+            // optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
+            // optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
+            // optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
+            // ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
+            // #else
+            // ssa_transport <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
+            // #endif // RADIATION
             
-            #ifdef DIFFUSION
-            diffusion_pos <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dt_dyn);
-            #endif // DIFFUSION
+            // #ifdef DIFFUSION
+            // diffusion_pos <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dt_dyn);
+            // #endif // DIFFUSION
 
-            cudaDeviceSynchronize();
+            // cudaDeviceSynchronize();
 
             timer_sim += dt_dyn;
             timer_out += dt_dyn;
@@ -306,14 +310,14 @@ int main (int argc, char **argv)
                 << std::endl;
         }   
     
-        // calculate dustdens grids for each output
-        dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
-        dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);
-        dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
+        // // calculate dustdens grids for each output
+        // dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
+        // dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);
+        // dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
 
-        cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
-        fname = PATH_OUT + "dustdens_" + frame_num(idx_file) + ".dat";
-        save_binary(fname, dustdens, N_GRD);
+        // cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_GRD, cudaMemcpyDeviceToHost);
+        // fname = PATH_OUT + "dustdens_" + frame_num(idx_file) + ".dat";
+        // save_binary(fname, dustdens, N_GRD);
 
         #ifdef RADIATION
         optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);

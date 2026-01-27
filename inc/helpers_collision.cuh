@@ -272,7 +272,7 @@ real _get_vrel (const swarm *dev_particle, int idx_old_i, int idx_old_j)
 // =========================================================================================================================
 
 template <KernelType kernel> __device__ __forceinline__
-real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j, real volume)
+real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j)
 {
     // text mainly from Drazkowska et al. 2013:
     // we assume that a limited number n representative particles represent all N physical particles
@@ -284,13 +284,11 @@ real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j, 
     real lam_ij = LAMBDA_0; // dimension issue saved for later
     real numr_j = dev_particle[idx_old_j].par_numr;
 
-    volume = 1.0; // for testing purpose only
-
     if constexpr (kernel == CONSTANT_KERNEL)
     {
         lam_ij *= 1.0; // by definition
         
-        return lam_ij * numr_j / volume;
+        return lam_ij * numr_j;
     }
     else if constexpr (kernel == LINEAR_KERNEL)
     {
@@ -298,9 +296,9 @@ real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j, 
         real size_j = dev_particle[idx_old_j].par_size;
 
         // m_i + m_j
-        lam_ij *= (_get_dust_mass(size_i) + _get_dust_mass(size_j)) / 2.0;
+        lam_ij *= _get_dust_mass(size_i)+_get_dust_mass(size_j);
         
-        return lam_ij * numr_j / volume;
+        return lam_ij * numr_j;
     }
     else if constexpr (kernel == PRODUCT_KERNEL)
     {
@@ -310,7 +308,7 @@ real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j, 
         // m_i * m_j
         lam_ij *= _get_dust_mass(size_i)*_get_dust_mass(size_j);
         
-        return lam_ij * numr_j / volume;
+        return lam_ij * numr_j;
     }
     else if constexpr (kernel == CUSTOM_KERNEL)
     {
@@ -326,7 +324,7 @@ real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j, 
         
         lam_ij *= v_rel_ij*sigma_ij;
         
-        return lam_ij * numr_j / volume;
+        return lam_ij * numr_j;
     }
     else
     {

@@ -32,7 +32,6 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
         if (!(in_x && in_y && in_z)) return; // particle is out of bounds, do nothing
 
         int  idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
-        real vol_cell = _get_grid_volume(idx_cell); // volume of the cell that particle i is in
         
         candidatelist query_result(MAX_DIST);
         cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
@@ -40,6 +39,9 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
 
         real col_rate_ij = 0.0; // collision rate between particle i and j
         real col_rate_i  = 0.0; // total collision rate for particle i
+
+        float dist2 = 0.0f;
+        float max_dist2 = 0.0f;
 
         int idx_old_j, idx_query;
 
@@ -50,13 +52,24 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_tre
 
             if (idx_query != -1) // if the j-th nearest neighbor exists within MAX_DIST
             {
+                dist2 = query_result.returnDist2(j);
+                max_dist2 = fmaxf(max_dist2, dist2);
+                
                 idx_old_j = dev_treenode[idx_query].index_old;
-                col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(K_COAG)> (dev_particle, idx_old_i, idx_old_j, vol_cell);
+                col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(K_COAG)> (dev_particle, idx_old_i, idx_old_j);
             }
 
             col_rate_i += col_rate_ij;
         }
 
+        real radius = sqrtf(static_cast<real>(max_dist2));
+        real volume = (4.0/3.0)*M_PI*radius*radius*radius;
+
+        volume = 1.0; // for testing purposes
+
+        col_rate_i /= volume;
+
+        dev_particle[idx_old_i].max_dist = radius;
         dev_particle[idx_old_i].col_rate = col_rate_i;
         atomicAdd(&dev_col_rate[idx_cell], col_rate_i);
     }

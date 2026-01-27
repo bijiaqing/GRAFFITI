@@ -4,10 +4,12 @@
 #include <algorithm>        // for std::lower_bound
 #include <chrono>           // for std::chrono::system_clock
 #include <ctime>            // for std::time_t, std::time, std::ctime
+#include <cmath>            // for std::abs, std::exp, std::log, std::pow, std::sqrt
 #include <fstream>          // for std::ofstream, std::ifstream
 #include <iomanip>          // for std::setw, std::setfill, std::setprecision
 #include <iostream>         // for std::cout, std::endl
 #include <random>           // for std::mt19937
+#include <stdexcept>        // for std::domain_error, std::runtime_error
 #include <string>           // for std::string
 #include <vector>           // for std::vector
 
@@ -67,13 +69,13 @@ void rand_pow_law (real *profile, int number, real p_min, real p_max, real idx_p
 }
 
 inline static __host__
-real _gaussian (real x, real mu, real std)
+real _get_gaussian (real x, real mu, real std)
 {
     return std::exp(-(x - mu)*(x - mu)/(2.0*std*std));
 }
 
 inline static __host__
-real _tapered_pow (real x, real x_min, real x_max, real idx_pow)
+real _get_tapered_pow (real x, real x_min, real x_max, real idx_pow)
 {
     if (x >= x_min && x <= x_max)
     {
@@ -111,7 +113,7 @@ void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_p
     {
         for (int k = 0; k < bins + 1; k++)
         {
-            y_axis[k] += _tapered_pow(x_axis[j], p_min, p_max, idx_pow)*_gaussian(x_axis[k], x_axis[j], 0.5*smooth);
+            y_axis[k] += _get_tapered_pow(x_axis[j], p_min, p_max, idx_pow)*_get_gaussian(x_axis[k], x_axis[j], 0.5*smooth);
         }
     }
 
@@ -142,6 +144,43 @@ void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_p
         // interpolate between x_axis[bin_lower-1] and x_axis[bin_lower]
         real bin_frac = (u_sample - cdf[bin_lower - 1]) / (cdf[bin_lower] - cdf[bin_lower - 1]);
         profile[sample_idx] = x_axis[bin_lower - 1] + bin_frac*dx;
+    }
+}
+
+inline static __host__
+real _get_lambertW_m1 (real z, int max_iter = 50, real tol = 1e-12)
+{
+    if (z < -1.0 / std::exp(1.0) || z >= 0.0) {
+        throw std::domain_error("lambertWm1: z out of domain");
+    }
+
+    // Initial guess (asymptotic for k = -1)
+    double w = std::log(-z);  // good starting point
+
+    for (int i = 0; i < max_iter; ++i) {
+        double ew = std::exp(w);
+        double f  = w * ew - z;
+        double df = ew * (w + 1.0);
+
+        double dw = f / df;
+        w -= dw;
+
+        if (std::abs(dw) < tol * (1.0 + std::abs(w))) {
+            return w;
+        }
+    }
+
+    throw std::runtime_error("lambertWm1: did not converge");
+}
+
+inline __host__
+void rand_4_linear (real *profile, int number) // initial distribution for linear kernel tests
+{
+    std::uniform_real_distribution <real> random(0.0, 1.0);
+
+    for (int i = 0; i < number; i++)
+    {
+        profile[i] = -(_get_lambertW_m1((random(rand_generator) - 1.0) / std::exp(1.0)) + 1.0);
     }
 }
 

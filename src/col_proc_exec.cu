@@ -43,8 +43,6 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             return; // no collision in the cell, do nothing
         }
         
-        real vol_cell = _get_grid_volume(idx_cell); // volume of the cell that particle i is in
-        
         // collision rate of the particle
         real col_rate_i = dev_particle[idx_old_i].col_rate;
         
@@ -66,15 +64,20 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             real col_rand_ij = col_rate_i*curand_uniform_double(&rs_swarm);
             real col_expt_ij = 0.0;
 
+            real radius = dev_particle[idx_old_i].max_dist;
+            real volume = (4.0/3.0)*M_PI*radius*radius*radius;
+
+            volume = 1.0; // for testing purposes
+
             // if particle idx_old_j *first* makes expt >= rand, it is the one that idx_old_i is going to collide with
             while (col_expt_ij < col_rand_ij && j < KNN_SIZE)
             {
                 idx_query = query_result.returnIndex(j);
 
                 if (idx_query != -1)
-                {
+                {   
                     idx_old_j = dev_treenode[idx_query].index_old;
-                    col_expt_ij += _get_col_rate_ij<static_cast<KernelType>(K_COAG)>(dev_particle, idx_old_i, idx_old_j, vol_cell);
+                    col_expt_ij += _get_col_rate_ij<static_cast<KernelType>(K_COAG)>(dev_particle, idx_old_i, idx_old_j) / volume;
                 }
 
                 j++;
@@ -122,7 +125,6 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
 
             dev_rs_swarm[idx_old_i] = rs_swarm;
         }
-        
     }
 }
 
