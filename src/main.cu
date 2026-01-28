@@ -19,18 +19,19 @@ std::mt19937 rand_generator;
 int main (int argc, char **argv)
 {
     int idx_resume;
-    real clock_sim = 0.0;   // total simulation time
-    real clock_out = 0.0;   // time accumulated toward the next output
+    real clock_sim;   // total simulation time
+    real clock_out;   // time accumulated toward the next output
+    real dt_out;      // output timestep
 
     #ifdef TRANSPORT
-    int count_dyn;          // how many dynamics timesteps in one output timestep
-    real dt_dyn;            // dynamical timestep
+    int count_dyn;    // how many dynamics timesteps in one output timestep
+    real dt_dyn;      // dynamical timestep
     #endif // TRANSPORT
     
     #ifdef COLLISION
-    int count_col;          // how many collision calculations in one dynamics timestep
-    real clock_dyn = 0.0;   // time accumulated toward the next dynamics timestep
-    real dt_col;            // collisional timestep
+    int count_col;    // how many collision calculations in one dynamics timestep
+    real clock_dyn;   // time accumulated toward the next dynamics timestep
+    real dt_col;      // collisional timestep
     #endif // COLLISION
     
     std::string fname;
@@ -40,9 +41,11 @@ int main (int argc, char **argv)
     cudaMallocHost((void**)&particle, sizeof(swarm)*N_P);
     cudaMalloc((void**)&dev_particle, sizeof(swarm)*N_P);
     
+    // #ifdef SAVE_DENS
     real *dustdens, *dev_dustdens;
     cudaMallocHost((void**)&dustdens, sizeof(real)*N_G);
     cudaMalloc((void**)&dev_dustdens, sizeof(real)*N_G);
+    // #endif // SAVE_DENS
 
     #if defined(TRANSPORT) && defined(RADIATION)
     real *optdepth, *dev_optdepth;
@@ -196,13 +199,24 @@ int main (int argc, char **argv)
     return 1;
     #endif // NO TRANSPORT and NO COLLISION
 
-    for (int idx_file = 1 + idx_resume; idx_file <= SAVE_MAX; idx_file++) // main evolution loop
+    #if defined(LOGTIMING) && defined(LOGOUTPUT)
+    std::cerr << "Error: Cannot enable both LOGTIMING and LOGOUTPUT simultaneously." << std::endl;
+    return 1;
+    #endif // LOGTIMING and LOGOUTPUT
+
+    clock_sim = static_cast<real>(idx_resume)*DT_OUT;
+
+    #ifdef LOGTIMING
+    for (int idx_file = (idx_resume == 0) ? 1 : idx_resume*LOG_BASE; idx_file <= SAVE_MAX; idx_file *= LOG_BASE)
+    #else  // LOGOUTPUT or LINEAR
+    for (int idx_file = idx_resume + 1; idx_file <= SAVE_MAX; idx_file++)
+    #endif // LOGTIMING
     {
-        #ifdef LOGOUTPUT
-        real dt_out = DT_OUT*pow(static_cast<real>(LOG_BASE), static_cast<real>(idx_file - 1));
-        #else  // LINEAR
-        real dt_out = DT_OUT;
-        #endif // LOGOUTPUT
+        #ifdef LOGTIMING
+        dt_out = (idx_file == 1) ? DT_OUT : static_cast<real>(idx_file - idx_file / LOG_BASE)*DT_OUT;
+        #else  // LOGOUTPUT or LINEAR
+        dt_out = DT_OUT;
+        #endif // LOGTIMING
         
         clock_out = 0.0; // reset output clock
         
@@ -342,9 +356,28 @@ int main (int argc, char **argv)
         save_binary(fname, dustdens, N_G);
         #endif // SAVE_DENS
 
+        #ifdef LOGTIMING
+        // both evolution and output are allowed in logarithmic time steps
         cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);
         fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
         save_binary(fname, particle, N_P);
+        #elif defined(LOGOUTPUT)
+        // only output is allowed in logarithmic time steps
+        if (is_log_power(idx_file))
+        {
+            cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);
+            fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
+            save_binary(fname, particle, N_P);
+        }
+        #else
+        // linear output
+        if (idx_file % LIN_BASE == 0)
+        {
+            cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);
+            fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
+            save_binary(fname, particle, N_P);
+        }
+        #endif // LOGTIMING
 
         msg_output(idx_file);
     }

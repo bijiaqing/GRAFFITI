@@ -78,26 +78,27 @@ void particle_init (swarm *dev_particle,
 
     if (idx < N_P)
     {
-        int par_per_cell = N_P / (N_X*N_Y*N_Z);
-        int idx_cell = idx / par_per_cell;
+        int par_per_cell = N_P / N_G;
         int residual = idx % par_per_cell;
-
+        int idx_cell = (idx - residual) / par_per_cell;
+        
         // invert flattening
         int idx_x = idx_cell % N_X;
         int idx_y = (idx_cell % NG_XY - idx_x) / N_X;
         int idx_z = (idx_cell - idx_y*N_X - idx_x) / NG_XY;
 
-        real dx =    (X_MAX - X_MIN)     / N_X;
-        real dy = pow(Y_MAX / Y_MIN, 1.0 / N_Y);
-        real dz =    (Z_MAX - Z_MIN)     / N_Z;
+        real dx =    (X_MAX - X_MIN)     / static_cast<real>(N_X);
+        real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
+        real dz =    (Z_MAX - Z_MIN)     / static_cast<real>(N_Z);
 
-        idx_x += 0.5; // move to cell center
-        idx_y += (residual + 0.5) / par_per_cell;
-        idx_z += 0.5;
+        // position assignment within each cell
+        real idx_xx = static_cast<real>(idx_x) +  0.5;
+        real idx_yy = static_cast<real>(idx_y) + (0.5 + static_cast<real>(residual)) / static_cast<real>(par_per_cell);
+        real idx_zz = static_cast<real>(idx_z) +  0.5;
 
-        dev_particle[idx].position.x = X_MIN + idx_x*dx;
-        dev_particle[idx].position.y = Y_MIN * pow(dy, idx_y);
-        dev_particle[idx].position.z = Z_MIN + idx_z*dz;
+        dev_particle[idx].position.x = X_MIN +     dx* idx_xx;
+        dev_particle[idx].position.y = Y_MIN * pow(dy, idx_yy);
+        dev_particle[idx].position.z = Z_MIN +     dz* idx_zz;
         
         // dev_particle[idx].position.x = dev_random_x[idx];
         // dev_particle[idx].position.y = dev_random_y[idx];

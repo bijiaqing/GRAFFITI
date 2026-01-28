@@ -59,8 +59,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             float max_search_dist = static_cast<float>(_get_hgas(polar_R)*polar_R);
             
             candidatelist query_result(max_search_dist);
-            cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
-                dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
+            cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
 
             int idx_old_j, idx_query, j = 0;
 

@@ -116,7 +116,7 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const int  SAVE_MAX     = 100000;           // total number of outputs for mesh fields
+const int  SAVE_MAX     = 1000000;             // total number of outputs for mesh fields
 
 const real DT_OUT       = 1.0;
 
@@ -124,13 +124,13 @@ const real DT_OUT       = 1.0;
 const real DT_DYN       = 0.1;
 #endif // TRANSPORT
 
-#ifdef LOGOUTPUT
-const int  LOG_BASE     = 10;               // save particle data at t = DT_OUT*LOG_BASE^N, N = 0, 1, 2, ...
+#if defined(LOGTIMING) || defined(LOGOUTPUT)
+const int  LOG_BASE     = 10;               // logarithmic base for time stepping (LOGTIMING) or particle output (LOGOUTPUT)
 #else  // LINEAR
-const int  LIN_BASE     = 1;                // save particle data at t = DT_OUT*LIN_BASE*N, N = 0, 1, 2, ...
-#endif // LOGOUTPUT
+const int  LIN_BASE     = 1;                // save particle data every LIN_BASE iterations
+#endif // LOGTIMING || LOGOUTPUT
 
-const real DT_MIN       = 1.0e-14;         // calculation steps with smaller dt will be skipped
+const real DT_MIN       = 1.0e-14;          // calculation steps with smaller dt will be skipped
 
 const std::string PATH_OUT = "./out/";
 

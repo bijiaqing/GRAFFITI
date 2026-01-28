@@ -23,8 +23,11 @@ NVCC += -DCODE_UNIT
 # SAVE_DENS: Save dust density field to output files
 # NVCC += -DSAVE_DENS
 
-# LOGOUTPUT: Use logarithmic output intervals
-NVCC += -DLOGOUTPUT
+# LOGTIMING: Use dynamic, logarithmic time stepping for the simulation evolution
+NVCC += -DLOGTIMING
+
+# LOGOUTPUT: Use logarithmic output intervals for particles with fixed output timesteps
+# NVCC += -DLOGOUTPUT
 
 # COLLISION: Enable dust collision and coagulation/fragmentation
 NVCC += -DCOLLISION
@@ -59,6 +62,7 @@ _INC = const.cuh             \
 
 _OBJ = col_flag_calc.o \
        col_proc_exec.o \
+       col_tree_init.o \
        col_rate_calc.o \
        col_rate_init.o \
        diffusion_pos.o \
@@ -77,8 +81,7 @@ _OBJ = col_flag_calc.o \
        rs_swarm_init.o \
        ssa_substep_1.o \
        ssa_substep_2.o \
-       ssa_transport.o \
-       col_tree_init.o
+       ssa_transport.o
 
 INC = $(patsubst %, $(INC_DIR)/%, $(_INC))
 OBJ = $(patsubst %, $(OBJ_DIR)/%, $(_OBJ))

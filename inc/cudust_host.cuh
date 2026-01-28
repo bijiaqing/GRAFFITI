@@ -216,17 +216,19 @@ inline __host__
 void msg_output (int idx_file)
 {
     std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    int length = std::max(3, static_cast<int>(std::to_string(SAVE_MAX).length()));
     std::cout   
         << std::endl << std::setfill('0')
-        << std::setw(3) << idx_file << "/" 
-        << std::setw(3) << SAVE_MAX << " finished on " << std::ctime(&end_time)
+        << std::setw(length) << idx_file << "/" 
+        << std::setw(length) << SAVE_MAX << " finished on " << std::ctime(&end_time)
         << std::endl;
 }
 
 inline __host__
-std::string frame_num (int number, std::size_t length = 5)
+std::string frame_num (int number)
 {
     std::string str = std::to_string(number);
+    int length = std::max(5, static_cast<int>(std::to_string(SAVE_MAX).length()));
     if (str.length() < length) str.insert(0, length - str.length(), '0');
     return str;
 }
@@ -344,11 +346,11 @@ bool save_variable (const std::string &file_name)
 
     // Time step and output
     file << "SAVE_MAX    = " << std::defaultfloat   << std::setprecision(8) << SAVE_MAX     << std::endl;
-    #ifdef LOGOUTPUT
+    #if defined(LOGTIMING) || defined(LOGOUTPUT)
     file << "LOG_BASE    = " << std::defaultfloat   << std::setprecision(8) << LOG_BASE     << std::endl;
     #else  // LINEAR
     file << "LIN_BASE    = " << std::defaultfloat   << std::setprecision(8) << LIN_BASE     << std::endl;
-    #endif // LOGOUTPUT
+    #endif // LOGOUTPUT or LOGTIMING
     file << "DT_OUT      = " << std::scientific     << std::setprecision(8) << DT_OUT       << std::endl;
     #ifdef TRANSPORT
     file << "DT_DYN      = " << std::scientific     << std::setprecision(8) << DT_DYN       << std::endl;
@@ -428,7 +430,7 @@ std::cout                                   \
 
 #define PRINT_TITLE_TO_SCREEN()             \
 std::cout << std::setfill(' ')              \
-<< std::setw(5)  << "idx"       << " "      \
+<< std::setw(10) << "idx"       << " "      \
 << std::setw(10) << "clock_sim" << " "      \
 << std::setw(10) << "clock_out" << " ";     \
 PRINT_TITLE_TRANSPORT();                    \
@@ -438,7 +440,7 @@ std::cout << std::endl;
 #define PRINT_VALUE_TO_SCREEN()             \
 std::cout << std::setfill(' ')              \
 << std::defaultfloat                        \
-<< std::setw(5)  << idx_file    << " "      \
+<< std::setw(10) << idx_file    << " "      \
 << std::scientific << std::setprecision(3)  \
 << std::setw(10) << clock_sim   << " "      \
 << std::scientific << std::setprecision(3)  \

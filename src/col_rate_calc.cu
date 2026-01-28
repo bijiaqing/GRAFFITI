@@ -31,15 +31,14 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col
 
         if (!(in_x && in_y && in_z)) return; // particle is out of bounds, do nothing
 
-        int  idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+        int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
 
         // maximum search distance for KNN neighbor search defined by gas scale height
         real polar_R = dev_particle[idx_old_i].position.y*sin(dev_particle[idx_old_i].position.z);
         float max_search_dist = static_cast<float>(_get_hgas(polar_R)*polar_R);
         
         candidatelist query_result(max_search_dist);
-        cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
-            dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
+        cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
 
         real col_rate_ij = 0.0; // collision rate between particle i and j
         real col_rate_i  = 0.0; // total collision rate for particle i
