@@ -13,7 +13,7 @@ void dustdens_init (real *dev_dustdens)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
     	
-    if (idx < N_GRD)
+    if (idx < N_G)
     {
         dev_dustdens[idx] = 0.0;
     }

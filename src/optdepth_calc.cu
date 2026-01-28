@@ -14,7 +14,7 @@ void optdepth_calc (real *dev_optdepth)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_GRD)
+    if (idx < N_G)
     {	
         real y0, dy;
         real volume = _get_grid_volume(idx, &y0, &dy);

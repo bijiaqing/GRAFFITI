@@ -296,7 +296,7 @@ real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j)
         real size_j = dev_particle[idx_old_j].par_size;
 
         // m_i + m_j
-        lam_ij *= _get_dust_mass(size_i)+_get_dust_mass(size_j);
+        lam_ij *= 0.5*(_get_dust_mass(size_i) + _get_dust_mass(size_j));
         
         return lam_ij * numr_j;
     }

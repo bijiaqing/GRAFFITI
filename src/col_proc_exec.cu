@@ -19,7 +19,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
     
     int idx_tree = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx_tree < N_PAR)
+    if (idx_tree < N_P)
     {
         int idx_old_i = dev_col_tree[idx_tree].index_old;
 
@@ -60,7 +60,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             
             candidatelist query_result(max_search_dist);
             cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
-                dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_PAR);
+                dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
 
             int idx_old_j, idx_query, j = 0;
 

@@ -14,7 +14,7 @@ void dustdens_calc (real *dev_dustdens)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_GRD)
+    if (idx < N_G)
     {	
         real volume = _get_grid_volume(idx);
         dev_dustdens[idx] /= volume;

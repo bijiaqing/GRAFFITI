@@ -314,7 +314,7 @@ bool save_variable (const std::string &file_name)
     file                                                                                    << std::endl;
 
     // Mesh domain
-    file << "N_PAR       = " << std::scientific     << std::setprecision(8) << N_PAR        << std::endl;
+    file << "N_P         = " << std::scientific     << std::setprecision(8) << N_P          << std::endl;
     file                                                                                    << std::endl;
     file << "N_X         = " << std::defaultfloat   << std::setprecision(8) << N_X          << std::endl;
     file << "X_MIN       = " << std::defaultfloat   << std::setprecision(8) << X_MIN        << std::endl;
@@ -327,6 +327,8 @@ bool save_variable (const std::string &file_name)
     file << "N_Z         = " << std::defaultfloat   << std::setprecision(8) << N_Z          << std::endl;
     file << "Z_MIN       = " << std::defaultfloat   << std::setprecision(8) << Z_MIN        << std::endl;
     file << "Z_MAX       = " << std::defaultfloat   << std::setprecision(8) << Z_MAX        << std::endl;
+    file                                                                                    << std::endl;
+    file << "N_G         = " << std::scientific     << std::setprecision(8) << N_G          << std::endl;
     file                                                                                    << std::endl;
 
     // Initialization parameters
@@ -394,20 +396,27 @@ std::cout                                   \
 #define PRINT_VALUE_TRANSPORT()
 #endif // TRANSPORT
 
-#ifdef COLLISION
+#if defined(COLLISION) && defined(TRANSPORT)
 #define PRINT_TITLE_COLLISION()             \
 std::cout                                   \
-#ifdef TRANSPORT
 << std::setw(10) << "clock_dyn" << " "      \
-#endif // TRANSPORT
 << std::setw(10) << "count_col" << " "      \
 << std::setw(10) << "dt_col"    << " ";
 #define PRINT_VALUE_COLLISION()             \
 std::cout                                   \
-#ifdef TRANSPORT
 << std::scientific << std::setprecision(3)  \
 << std::setw(10) << clock_dyn   << " "      \
-#endif // TRANSPORT
+<< std::defaultfloat                        \
+<< std::setw(10) << count_col   << " "      \
+<< std::scientific << std::setprecision(3)  \
+<< std::setw(10) << dt_col      << " ";
+#elif defined(COLLISION)
+#define PRINT_TITLE_COLLISION()             \
+std::cout                                   \
+<< std::setw(10) << "count_col" << " "      \
+<< std::setw(10) << "dt_col"    << " ";
+#define PRINT_VALUE_COLLISION()             \
+std::cout                                   \
 << std::defaultfloat                        \
 << std::setw(10) << count_col   << " "      \
 << std::scientific << std::setprecision(3)  \

@@ -17,7 +17,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col
     
     int idx_tree = threadIdx.x+blockDim.x*blockIdx.x; // this is the index for the particle (idx_old_i) on the k-d tree
 
-    if (idx_tree < N_PAR)
+    if (idx_tree < N_P)
     {
         int idx_old_i = dev_col_tree[idx_tree].index_old;
         
@@ -39,7 +39,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col
         
         candidatelist query_result(max_search_dist);
         cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, 
-            dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_PAR);
+            dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
 
         real col_rate_ij = 0.0; // collision rate between particle i and j
         real col_rate_i  = 0.0; // total collision rate for particle i

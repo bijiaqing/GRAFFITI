@@ -13,7 +13,7 @@ void rs_grids_init (curs *dev_rs_grids, int seed)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_GRD)
+    if (idx < N_G)
     {
         curand_init(seed, idx, 0, &dev_rs_grids[idx]);
     }

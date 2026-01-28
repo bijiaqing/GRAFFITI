@@ -16,7 +16,7 @@ void diffusion_pos (swarm *dev_particle, curs *dev_rs_swarm, real dt)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_PAR)
+    if (idx < N_P)
     {
         real y = dev_particle[idx].position.y;
         real z = dev_particle[idx].position.z;

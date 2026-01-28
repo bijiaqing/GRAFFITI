@@ -53,8 +53,8 @@ real _get_grain_number (real size)
 
     // finally, combining (3) and (9), we know n_d(s)
 
-    real numr = M_D / N_PAR / RHO_0 / size / size / size; // for test only
-    // real numr = M_D / N_PAR / _get_dust_mass(size);
+    real numr = M_D / N_P / RHO_0 / size / size / size; // for test only
+    // real numr = M_D / N_P / _get_dust_mass(size);
 
     #ifdef RADIATION // keep total surface area for individual swarms the same
     {
@@ -76,31 +76,28 @@ void particle_init (swarm *dev_particle,
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_PAR)
+    if (idx < N_P)
     {
-        int par_per_cell = 80;
-        
-        // cell index and particle-in-cell index
+        int par_per_cell = N_P / (N_X*N_Y*N_Z);
         int idx_cell = idx / par_per_cell;
         int residual = idx % par_per_cell;
-
-        // Sub-grid indices: 4×4×5 = 80 particles per cell
-        int sub_x = residual % 4;           // 0-3
-        int sub_z = (residual / 4) % 4;     // 0-3
-        int sub_y = residual / 16;          // 0-4
 
         // invert flattening
         int idx_x = idx_cell % N_X;
         int idx_y = (idx_cell % NG_XY - idx_x) / N_X;
         int idx_z = (idx_cell - idx_y*N_X - idx_x) / NG_XY;
 
-        real dx = (X_MAX - X_MIN) / static_cast<real>(N_X);
-        real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
-        real dz = (Z_MAX - Z_MIN) / static_cast<real>(N_Z);
+        real dx =    (X_MAX - X_MIN)     / N_X;
+        real dy = pow(Y_MAX / Y_MIN, 1.0 / N_Y);
+        real dz =    (Z_MAX - Z_MIN)     / N_Z;
 
-        dev_particle[idx].position.x = X_MIN + (idx_x + (sub_x + 0.5) / 4.0) * dx;
-        dev_particle[idx].position.y = Y_MIN * pow(dy, static_cast<real>(idx_y + (sub_y + 0.5) / 5.0));
-        dev_particle[idx].position.z = Z_MIN + (idx_z + (sub_z + 0.5) / 4.0) * dz;
+        idx_x += 0.5; // move to cell center
+        idx_y += (residual + 0.5) / par_per_cell;
+        idx_z += 0.5;
+
+        dev_particle[idx].position.x = X_MIN + idx_x*dx;
+        dev_particle[idx].position.y = Y_MIN * pow(dy, idx_y);
+        dev_particle[idx].position.z = Z_MIN + idx_z*dz;
         
         // dev_particle[idx].position.x = dev_random_x[idx];
         // dev_particle[idx].position.y = dev_random_y[idx];
@@ -111,7 +108,7 @@ void particle_init (swarm *dev_particle,
         dev_particle[idx].velocity.z = 0.0;
 
         dev_particle[idx].par_size   = cbrt(6.0 / M_PI*dev_random_s[idx]);
-        dev_particle[idx].par_numr   = M_D / N_PAR / dev_random_s[idx]; // meaning m_bar = 1
+        dev_particle[idx].par_numr   = M_D / N_P / dev_random_s[idx]; // meaning m_bar = 1
 
         // dev_particle[idx].par_size   = dev_random_s[idx];
         // dev_particle[idx].par_numr   = _get_grain_number(dev_random_s[idx]);

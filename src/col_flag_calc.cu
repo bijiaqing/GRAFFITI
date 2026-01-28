@@ -13,7 +13,7 @@ void col_flag_calc (int *dev_col_flag, curs *dev_rs_grids, real *dev_col_rand, c
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_GRD)
+    if (idx < N_G)
     {
         curs rs_grids = dev_rs_grids[idx];
         

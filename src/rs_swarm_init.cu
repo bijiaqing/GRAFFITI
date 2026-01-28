@@ -13,7 +13,7 @@ void rs_swarm_init (curs *dev_rs_swarm, int seed)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_PAR)
+    if (idx < N_P)
     {
         curand_init(seed, idx, 0, &dev_rs_swarm[idx]);
     }

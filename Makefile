@@ -24,7 +24,7 @@ NVCC += -DCODE_UNIT
 # NVCC += -DSAVE_DENS
 
 # LOGOUTPUT: Use logarithmic output intervals
-# NVCC += -DLOGOUTPUT
+NVCC += -DLOGOUTPUT
 
 # COLLISION: Enable dust collision and coagulation/fragmentation
 NVCC += -DCOLLISION
@@ -88,11 +88,11 @@ OBJ = $(patsubst %, $(OBJ_DIR)/%, $(_OBJ))
 all: $(EXEC)
 
 $(EXEC): $(OBJ)
-	@printf "%-12s %-25s %s\n" "Linking" "$@" "from $(words $(OBJ)) objects"
+	@printf "%-12s %-20s %s\n" "Linking" "$@" "from $(words $(OBJ)) objects"
 	@$(NVCC) -o $@ $^
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu $(INC) | $(OBJ_DIR)
-	@printf "%-12s %-25s -> %s\n" "Compiling" "$<" "$@"
+	@printf "%-12s %-20s -> %s\n" "Compiling" "$<" "$@"
 	@$(NVCC) --device-c -o $@ $< -I $(INC_DIR)
 
 $(OBJ_DIR):

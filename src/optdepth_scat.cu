@@ -14,7 +14,7 @@ void optdepth_scat (real *dev_optdepth, const swarm *dev_particle)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_PAR)
+    if (idx < N_P)
     {
         _particle_to_grid_core <OPTDEPTH> (dev_optdepth, dev_particle, idx);
     }

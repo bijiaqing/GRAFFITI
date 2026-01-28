@@ -14,7 +14,7 @@ void ssa_transport (swarm *dev_particle, real dt)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
-    if (idx < N_PAR)
+    if (idx < N_P)
     {
         real x_i, y_i, z_i;
         real x_1, y_1, z_1;

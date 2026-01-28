@@ -28,19 +28,21 @@ const real  S_0         = 1.0;              // the reference grain size of the d
 // =========================================================================================================================
 // mesh domain size and resolution
 
-const int   N_PAR       = 1e+07;            // total number of super-particles in the model
+const int   N_P         = 1e+07;            // total number of super-particles in the model
 
-const int   N_X         = 50;               // number of grid cells in X direction (azimuth)
+const int   N_X         = 100;              // number of grid cells in X direction (azimuth)
 const real  X_MIN       = -M_PI;            // minimum X boundary (azimuth)
 const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 
-const int   N_Y         = 50;               // number of grid cells in Y direction (radius)
+const int   N_Y         = 100;              // number of grid cells in Y direction (radius)
 const real  Y_MIN       = 0.5;              // minimum Y boundary (radius)
 const real  Y_MAX       = 1.5;              // maximum Y boundary (radius)
 
-const int   N_Z         = 50;               // number of grid cells in Z direction (colattitude)
+const int   N_Z         = 100;              // number of grid cells in Z direction (colattitude)
 const real  Z_MIN       = 0.5*M_PI - 0.2;   // minimum Z boundary (colattitude)
 const real  Z_MAX       = 0.5*M_PI + 0.2;   // maximum Z boundary (colattitude)
+
+const int   N_G         = N_X*N_Y*N_Z;      // total number of grid cells
 
 // =========================================================================================================================
 // gas parameters
@@ -89,10 +91,10 @@ const real  SC_Z        = 1.0;              // the Schmidt number for vertical d
 #endif // DIFFUSION or COLLISION
 
 #ifdef COLLISION
-const int   COAG_KERNEL = 2;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
-const int   N_K         = 200;              // the maximum number for KNN neighbor search 
+const int   COAG_KERNEL = 0;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
+const int   N_K         = 10;              // the maximum number for KNN neighbor search 
 
-const real  LAMBDA_0    = N_X*N_Y*N_Z/N_K;  // the reference collision rate of the dust
+const real  LAMBDA_0    = N_G / N_K / M_D;
 const real  V_FRAG      = 1.0;              // the fragmentation velocity for dust collision
 #endif // COLLISION
 
@@ -114,16 +116,16 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const int  SAVE_MAX     = 20;              // total number of outputs for mesh fields
+const int  SAVE_MAX     = 100000;           // total number of outputs for mesh fields
 
-const real DT_OUT       = 0.1;
+const real DT_OUT       = 1.0;
 
 #ifdef TRANSPORT
 const real DT_DYN       = 0.1;
 #endif // TRANSPORT
 
 #ifdef LOGOUTPUT
-const int  LOG_BASE     = 2;               // save particle data at t = DT_OUT*LOG_BASE^N, N = 0, 1, 2, ...
+const int  LOG_BASE     = 10;               // save particle data at t = DT_OUT*LOG_BASE^N, N = 0, 1, 2, ...
 #else  // LINEAR
 const int  LIN_BASE     = 1;                // save particle data at t = DT_OUT*LIN_BASE*N, N = 0, 1, 2, ...
 #endif // LOGOUTPUT
@@ -174,13 +176,12 @@ struct tree_traits                          // traits for cukd::builder
 
 const int THREADS_PER_BLOCK = 32;               // number of threads per block
 
-const int N_GRD = N_X*N_Y*N_Z;                  // total number of grid cells
 const int NG_XY = N_X*N_Y;                      // number of grid cells in X-Y plane
 const int NG_XZ = N_X*N_Z;                      // number of grid cells in X-Z plane
 const int NG_YZ = N_Y*N_Z;                      // number of grid cells in Y-Z plane
 
-const int NB_P = N_PAR / THREADS_PER_BLOCK + 1; // number of blocks for swarm-level parallelization
-const int NB_A = N_GRD / THREADS_PER_BLOCK + 1; // number of blocks for cell-level  parallelization
+const int NB_P = N_P   / THREADS_PER_BLOCK + 1; // number of blocks for swarm-level parallelization
+const int NB_A = N_G   / THREADS_PER_BLOCK + 1; // number of blocks for cell-level  parallelization
 const int NB_X = NG_YZ / THREADS_PER_BLOCK + 1; // number of blocks for X-direction parallelization
 const int NB_Y = NG_XZ / THREADS_PER_BLOCK + 1; // number of blocks for Y-direction parallelization
 
