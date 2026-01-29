@@ -185,6 +185,40 @@ void rand_4_linear (real *profile, int number) // initial distribution for linea
 }
 
 // =========================================================================================================================
+// Get dt_out based on output index and output mode
+// =========================================================================================================================
+
+inline static __host__
+real int_pow (int base, int exp)
+{
+    int result = 1;
+
+    for (int i = 0; i < exp; i++)
+    {
+        result *= base;
+    }
+    
+    return static_cast<real>(result);
+}
+
+inline __host__
+real _get_dt_out (int idx_file)
+{
+    #ifdef LOGTIMING
+    if (idx_file == 1)
+    {
+        return DT_OUT*(int_pow(LOG_BASE, idx_file) - 0.0);
+    }
+    else
+    {
+        return DT_OUT*(int_pow(LOG_BASE, idx_file) - int_pow(LOG_BASE, idx_file - 1));
+    }
+    #else  // LOGOUTPUT or LINEAR
+    return DT_OUT;
+    #endif // LOGTIMING
+}
+
+// =========================================================================================================================
 // Binary file I/O templates
 // =========================================================================================================================
 

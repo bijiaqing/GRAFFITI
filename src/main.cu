@@ -41,11 +41,11 @@ int main (int argc, char **argv)
     cudaMallocHost((void**)&particle, sizeof(swarm)*N_P);
     cudaMalloc((void**)&dev_particle, sizeof(swarm)*N_P);
     
-    // #ifdef SAVE_DENS
+    #ifdef SAVE_DENS
     real *dustdens, *dev_dustdens;
     cudaMallocHost((void**)&dustdens, sizeof(real)*N_G);
     cudaMalloc((void**)&dev_dustdens, sizeof(real)*N_G);
-    // #endif // SAVE_DENS
+    #endif // SAVE_DENS
 
     #if defined(TRANSPORT) && defined(RADIATION)
     real *optdepth, *dev_optdepth;
@@ -199,24 +199,30 @@ int main (int argc, char **argv)
     return 1;
     #endif // NO TRANSPORT and NO COLLISION
 
-    #if defined(LOGTIMING) && defined(LOGOUTPUT)
-    std::cerr << "Error: Cannot enable both LOGTIMING and LOGOUTPUT simultaneously." << std::endl;
+    #ifdef LOGTIMING
+    #ifdef LOGOUTPUT
+    std::cerr << "Error: LOGTIMING and LOGOUTPUT cannot be enabled simultaneously." << std::endl;
     return 1;
-    #endif // LOGTIMING and LOGOUTPUT
-
-    clock_sim = static_cast<real>(idx_resume)*DT_OUT;
+    #endif // LOGOUTPUT
+    #ifdef TRANSPORT
+    std::cerr << "Error: LOGTIMING is not compatible with TRANSPORT module." << std::endl;
+    return 1;
+    #endif // TRANSPORT
+    #ifdef SAVE_DENS
+    std::cerr << "Error: LOGTIMING is not compatible with SAVE_DENS module." << std::endl;
+    return 1;
+    #endif // SAVE_DENS
+    #endif // LOGTIMING
 
     #ifdef LOGTIMING
-    for (int idx_file = (idx_resume == 0) ? 1 : idx_resume*LOG_BASE; idx_file <= SAVE_MAX; idx_file *= LOG_BASE)
+    clock_sim = (idx_resume == 0) ? 0.0 : int_pow(LOG_BASE, idx_resume)*DT_OUT;
     #else  // LOGOUTPUT or LINEAR
-    for (int idx_file = idx_resume + 1; idx_file <= SAVE_MAX; idx_file++)
+    clock_sim =                           static_cast<real>(idx_resume)*DT_OUT;
     #endif // LOGTIMING
+
+    for (int idx_file = idx_resume + 1; idx_file <= SAVE_MAX; idx_file++)
     {
-        #ifdef LOGTIMING
-        dt_out = (idx_file == 1) ? DT_OUT : static_cast<real>(idx_file - idx_file / LOG_BASE)*DT_OUT;
-        #else  // LOGOUTPUT or LINEAR
-        dt_out = DT_OUT;
-        #endif // LOGTIMING
+        dt_out = _get_dt_out(idx_file);
         
         clock_out = 0.0; // reset output clock
         

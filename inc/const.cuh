@@ -94,7 +94,7 @@ const real  SC_Z        = 1.0;              // the Schmidt number for vertical d
 const int   COAG_KERNEL = 0;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
 const int   N_K         = 10;              // the maximum number for KNN neighbor search 
 
-const real  LAMBDA_0    = N_G / N_K / M_D;
+const real  LAMBDA_0    = N_P / N_K / M_D;
 const real  V_FRAG      = 1.0;              // the fragmentation velocity for dust collision
 #endif // COLLISION
 
@@ -116,7 +116,7 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const int  SAVE_MAX     = 1000000;             // total number of outputs for mesh fields
+const int  SAVE_MAX     = 8;                // total number of outputs for mesh fields
 
 const real DT_OUT       = 1.0;
 
