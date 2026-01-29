@@ -36,7 +36,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             return; // particle is out of bounds, do nothing
         }
 
-        int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+        int idx_cell = static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
 
         if (dev_col_flag[idx_cell] == 0)
         {
@@ -61,8 +61,6 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             candidatelist query_result(max_search_dist);
             cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
 
-            int idx_old_j, idx_query, j = 0;
-
             // col_rand_ij is now a value between 0 and the total collision rate of the particle
             real col_rand_ij = col_rate_i*curand_uniform_double(&rs_swarm);
             real col_expt_ij = 0.0;
@@ -72,10 +70,12 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
 
             volume = 1.0; // for testing purposes
 
+            int idx_old_j, j = 0;
+
             // if particle idx_old_j *first* makes expt >= rand, it is the one that idx_old_i is going to collide with
             while (col_expt_ij < col_rand_ij && j < N_K)
             {
-                idx_query = query_result.returnIndex(j);
+                int idx_query = query_result.returnIndex(j);
 
                 if (idx_query != -1)
                 {   
@@ -89,23 +89,20 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             real v_rel = 0.0;
             // real v_rel = _get_vrel(dev_particle, idx_old_i, idx_old_j);
 
+            real size_i = dev_particle[idx_old_i].par_size;
+            real size_j = dev_particle[idx_old_j].par_size;
+            real size_k = cbrt(size_i*size_i*size_i + size_j*size_j*size_j);
+
             if (v_rel <= V_FRAG)
             {
                 // collide with idx_old_j and MERGE
-                real size_i = dev_particle[idx_old_i].par_size;
-                real size_j = dev_particle[idx_old_j].par_size;
-                real size_k = cbrt(size_i*size_i*size_i + size_j*size_j*size_j);
-
                 dev_particle[idx_old_i].par_size  = size_k;
                 dev_particle[idx_old_i].par_numr *= (size_i*size_i*size_i) / (size_k*size_k*size_k);
             }
             else
             {
                 // collide with idx_old_j and BREAK-UP
-                real size_i = dev_particle[idx_old_i].par_size;
-                real size_j = dev_particle[idx_old_j].par_size;
-                real size_k = cbrt(size_i*size_i*size_i + size_j*size_j*size_j);
-                real rand   = curand_uniform_double(&rs_swarm);  // distribution in (0, 1]
+                real rand = curand_uniform_double(&rs_swarm);  // distribution in (0, 1]
 
                 // determine the fragmentation outcome using inverse transform sampling
                 // see https://en.wikipedia.org/wiki/Inverse_transform_sampling

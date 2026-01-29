@@ -24,7 +24,7 @@ real _get_optdepth (const real *dev_optdepth, real loc_x, real loc_y, real loc_z
 
     if (in_x && in_y && in_z)
     {
-        int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+        int idx_cell = static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
         auto [next_x, next_y, next_z, frac_x, frac_y, frac_z] = _3d_interp_outer_y(loc_x, loc_y, loc_z);
 
         optdepth += dev_optdepth[idx_cell                           ]*(1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z);

@@ -84,12 +84,12 @@ void _1d_interp_midpt_z (real loc_z, real deci_z, real &frac_z, int &next_z)
             if (deci_z >= 0.5)
             {
                 frac_z = deci_z - 0.5;
-                next_z = NG_XY;     // the index distance to the next Z cell on the right is N_X*N_Y = NG_XY
+                next_z = (N_X*N_Y);     // the index distance to the next Z cell on the right is N_X*N_Y = (N_X*N_Y)
             }
             else
             {
                 frac_z = 0.5 - deci_z;
-                next_z = -NG_XY;
+                next_z = -(N_X*N_Y);
             }
         }
         else                        // at the Z domain boundaries, the current cell take it all like N_Z = 1
@@ -226,7 +226,7 @@ void _particle_to_grid_core(real *dev_grid, const swarm *dev_particle, int idx)
         return; // particle is out of the grid, do nothing
     }
 
-    int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+    int idx_cell = static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
     auto [next_x, next_y, next_z, frac_x, frac_y, frac_z] = _3d_interp_midpt_y(loc_x, loc_y, loc_z);
 
     real size = dev_particle[idx].par_size;    

@@ -80,12 +80,11 @@ void particle_init (swarm *dev_particle,
     {
         int par_per_cell = N_P / N_G;
         int residual = idx % par_per_cell;
-        int idx_cell = (idx - residual) / par_per_cell;
+        int idx_cell = idx / par_per_cell;
         
-        // invert flattening
         int idx_x = idx_cell % N_X;
-        int idx_y = (idx_cell % NG_XY - idx_x) / N_X;
-        int idx_z = (idx_cell - idx_y*N_X - idx_x) / NG_XY;
+        int idx_y = (idx_cell / N_X) % N_Y;
+        int idx_z = idx_cell / (N_X*N_Y);
 
         real dx =    (X_MAX - X_MIN)     / static_cast<real>(N_X);
         real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));

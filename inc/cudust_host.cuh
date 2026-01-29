@@ -68,6 +68,9 @@ void rand_pow_law (real *profile, int number, real p_min, real p_max, real idx_p
     }
 }
 
+// ========================================================================================================================
+// rand_convpow: generate random numbers following a convolved power-law distribution using inverse transform sampling
+
 inline static __host__
 real _get_gaussian (real x, real mu, real std)
 {
@@ -90,16 +93,11 @@ real _get_tapered_pow (real x, real x_min, real x_max, real idx_pow)
 inline __host__
 void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_pow, real smooth, int bins)
 {
-    // a convolved (i.e., smoothed) power-law profile
-    
-    // x_min and x_max define the hard boundary of the smoothed profile
-    // p_min and p_max define the domain that is not too much smoothed
     real p_min = x_min + 2.0*smooth;
     real p_max = x_max - 2.0*smooth;
     
-    // Build x-axis and compute convolved profile
-    std::vector<real> x_axis(bins + 1);
-    std::vector<real> y_axis(bins + 1, 0.0);
+    std::vector <real> x_axis(bins + 1);
+    std::vector <real> y_axis(bins + 1, 0.0);
     
     real dx = (x_max - x_min) / static_cast<real>(bins);
     
@@ -108,7 +106,6 @@ void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_p
         x_axis[i] = x_min + i*dx;
     }
 
-    // Convolve tapered power law with Gaussian kernel
     for (int j = 0; j < bins + 1; j++)
     {
         for (int k = 0; k < bins + 1; k++)
@@ -117,9 +114,8 @@ void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_p
         }
     }
 
-    // Build CDF for inverse transform sampling
-    std::uniform_real_distribution<real> random(0.0, 1.0);
-    std::vector<real> cdf(bins + 1);
+    std::uniform_real_distribution <real> random(0.0, 1.0);
+    std::vector <real> cdf(bins + 1);
     cdf[0] = 0.0;
     
     for (int bin_idx = 1; bin_idx <= bins; bin_idx++)
@@ -131,42 +127,46 @@ void rand_convpow (real *profile, int number, real x_min, real x_max, real idx_p
     
     for (int bin_idx = 0; bin_idx <= bins; bin_idx++)
     {
-        cdf[bin_idx] /= cdf_total;  // normalize to [0,1]
+        cdf[bin_idx] /= cdf_total;
     }
 
-    // Sample using binary search, more efficient than rejection sampling
     for (int sample_idx = 0; sample_idx < number; sample_idx++)
     {
         real u_sample = random(rand_generator);
         auto cdf_iter = std::lower_bound(cdf.begin(), cdf.end(), u_sample);
-        int bin_lower = cdf_iter - cdf.begin();
+        int bin_lower = std::max(0, static_cast<int>(cdf_iter - cdf.begin()) - 1);
         
-        // interpolate between x_axis[bin_lower-1] and x_axis[bin_lower]
-        real bin_frac = (u_sample - cdf[bin_lower - 1]) / (cdf[bin_lower] - cdf[bin_lower - 1]);
-        profile[sample_idx] = x_axis[bin_lower - 1] + bin_frac*dx;
+        // interpolate between x_axis[bin_lower] and x_axis[bin_lower+1]
+        real bin_frac = (u_sample - cdf[bin_lower]) / (cdf[bin_lower + 1] - cdf[bin_lower]);
+        profile[sample_idx] = x_axis[bin_lower] + bin_frac*dx;
     }
 }
 
+// =========================================================================================================================
+// Random profile generation for special cases (e.g., Lambert W function for linear coagulation kernel)
+
+#ifdef COLLISION
 inline static __host__
 real _get_lambertW_m1 (real z, int max_iter = 50, real tol = 1e-12)
 {
-    if (z < -1.0 / std::exp(1.0) || z >= 0.0) {
+    if (z < -1.0 / std::exp(1.0) || z >= 0.0) 
+    {
         throw std::domain_error("lambertWm1: z out of domain");
     }
 
-    // Initial guess (asymptotic for k = -1)
-    double w = std::log(-z);  // good starting point
+    // initial guess (asymptotic for k = -1)
+    double val = std::log(-z);
 
-    for (int i = 0; i < max_iter; ++i) {
-        double ew = std::exp(w);
-        double f  = w * ew - z;
-        double df = ew * (w + 1.0);
+    for (int i = 0; i < max_iter; ++i)
+    {
+        double exp_val = std::exp(val);
+        double d_val = (val*exp_val - z) / (exp_val*(val + 1.0));
+        
+        val -= d_val;
 
-        double dw = f / df;
-        w -= dw;
-
-        if (std::abs(dw) < tol * (1.0 + std::abs(w))) {
-            return w;
+        if (std::abs(d_val) < tol*(1.0 + std::abs(val))) 
+        {
+            return val;
         }
     }
 
@@ -183,12 +183,99 @@ void rand_4_linear (real *profile, int number) // initial distribution for linea
         profile[i] = -(_get_lambertW_m1((random(rand_generator) - 1.0) / std::exp(1.0)) + 1.0);
     }
 }
+#endif // COLLISION
+
+// =========================================================================================================================
+// rand_from_file: generate random positions following dust mass distribution from gas density and dust-to-gas ratio
+
+#ifdef IMPORTGAS
+inline __host__
+void rand_from_file (real *pos_x, real *pos_y, real *pos_z, int number, const real *gas_dens, const real *epsilon)
+{
+    std::uniform_real_distribution<real> random(0.0, 1.0);
+    
+    bool enable_x = (N_X > 1);
+    bool enable_z = (N_Z > 1);
+    
+    real dx =         (X_MAX - X_MIN)     / static_cast<real>(N_X);
+    real dy = std::pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
+    real dz =         (Z_MAX - Z_MIN)     / static_cast<real>(N_Z);
+    
+    real idx_dim = static_cast<real>(enable_x) + static_cast<real>(enable_z) + 1.0;
+    real dy_pow = std::pow(dy, idx_dim);
+    
+    // compute dust mass in each cell using same volume calculation as _get_grid_volume
+    std::vector <real> dust_mass(N_G);
+    real total_mass = 0.0;
+    
+    for (int idx_z = 0; idx_z < N_Z; idx_z++)
+    {
+        real z0 = Z_MIN + dz*static_cast<real>(idx_z);
+        real vol_z = enable_z ? (std::cos(z0) - std::cos(z0 + dz)) : 1.0;
+        
+        for (int idx_y = 0; idx_y < N_Y; idx_y++)
+        {
+            real y0 = Y_MIN*std::pow(dy, static_cast<real>(idx_y));
+            real vol_y = std::pow(y0, idx_dim)*(dy_pow - 1.0) / idx_dim;
+            
+            for (int idx_x = 0; idx_x < N_X; idx_x++)
+            {
+                real vol_x = enable_x ? dx : 1.0;
+                real cell_volume = vol_x*vol_y*vol_z;
+                
+                int idx = idx_x + idx_y*N_X + idx_z*N_X*N_Y;
+                dust_mass[idx] = gas_dens[idx]*epsilon[idx]*cell_volume;
+                total_mass += dust_mass[idx];
+            }
+        }
+    }
+    
+    // build cumulative distribution function
+    std::vector <real> cdf(N_G + 1);
+    cdf[0] = 0.0;
+    
+    for (int idx = 0; idx < N_G; idx++)
+    {
+        cdf[idx + 1] = cdf[idx] + dust_mass[idx];
+    }
+    
+    // normalize CDF to [0, 1]
+    for (int idx = 0; idx <= N_G; idx++)
+    {
+        cdf[idx] /= total_mass;
+    }
+    
+    // sample particles using inverse transform sampling
+    for (int i = 0; i < number; i++)
+    {
+        real u_sample = random(rand_generator);
+        
+        // binary search to find cell
+        auto cdf_iter = std::lower_bound(cdf.begin(), cdf.end(), u_sample);
+        int idx_cell = std::max(0, static_cast<int>(cdf_iter - cdf.begin()) - 1);
+        
+        int idx_x = idx_cell % N_X;
+        int idx_y = (idx_cell / N_X) % N_Y;
+        int idx_z = idx_cell / (N_X * N_Y);
+        
+        // y: radius (logarithmic spacing) - sample uniformly in r^idx_dim within cell
+        real y0 = Y_MIN*std::pow(dy, static_cast<real>(idx_y));
+        real y0_pow = std::pow(y0, idx_dim);
+        real y_pow = y0_pow*(1.0 + (dy_pow - 1.0)*random(rand_generator));
+
+        // randomly position particle within the cell
+        pos_x[i] = X_MIN + dx*(static_cast<real>(idx_x) + random(rand_generator));
+        pos_y[i] = std::pow(y_pow, 1.0 / idx_dim);
+        pos_z[i] = Z_MIN + dz*(static_cast<real>(idx_z) + random(rand_generator));
+    }
+}
+#endif // IMPORTGAS
 
 // =========================================================================================================================
 // Get dt_out based on output index and output mode
 // =========================================================================================================================
 
-inline static __host__
+inline __host__
 real int_pow (int base, int exp)
 {
     int result = 1;
@@ -247,6 +334,15 @@ bool load_binary (const std::string &file_name, DataType *data, int number)
 // =========================================================================================================================
 
 inline __host__
+std::string frame_num (int number)
+{
+    std::string str = std::to_string(number);
+    int length = std::max(5, static_cast<int>(std::to_string(SAVE_MAX).length()));
+    if (str.length() < length) str.insert(0, length - str.length(), '0');
+    return str;
+}
+
+inline __host__
 void msg_output (int idx_file)
 {
     std::time_t end_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -256,15 +352,6 @@ void msg_output (int idx_file)
         << std::setw(length) << idx_file << "/" 
         << std::setw(length) << SAVE_MAX << " finished on " << std::ctime(&end_time)
         << std::endl;
-}
-
-inline __host__
-std::string frame_num (int number)
-{
-    std::string str = std::to_string(number);
-    int length = std::max(5, static_cast<int>(std::to_string(SAVE_MAX).length()));
-    if (str.length() < length) str.insert(0, length - str.length(), '0');
-    return str;
 }
 
 #ifdef LOGOUTPUT
@@ -294,6 +381,36 @@ bool is_log_power (int idx_file)
     }
 }
 #endif // LOGOUTPUT
+
+#ifdef IMPORTGAS
+inline __host__
+bool load_epsilon (const std::string &path, int idx_file, real *epsilon)
+{
+    std::string fname = path + "epsilon_" + frame_num(idx_file) + ".dat";
+    return load_binary(fname, epsilon, N_G);
+}
+
+inline __host__
+bool load_gas_data (const std::string &path, int idx_file, real *gasdens, real *gasvelx, real *gasvely, real *gasvelz)
+{
+    std::string fname;
+    bool success = true;
+    
+    fname = path + "gasdens_" + frame_num(idx_file) + ".dat";
+    success &= load_binary(fname, gasdens, N_G);
+    
+    fname = path + "gasvelx_" + frame_num(idx_file) + ".dat";
+    success &= load_binary(fname, gasvelx, N_G);
+    
+    fname = path + "gasvely_" + frame_num(idx_file) + ".dat";
+    success &= load_binary(fname, gasvely, N_G);
+    
+    fname = path + "gasvelz_" + frame_num(idx_file) + ".dat";
+    success &= load_binary(fname, gasvelz, N_G);
+    
+    return success;
+}
+#endif // IMPORTGAS
 
 inline __host__
 bool save_variable (const std::string &file_name)
@@ -411,6 +528,69 @@ bool save_variable (const std::string &file_name)
     
     return file.good();
 }
+
+// =========================================================================================================================
+// File I/O macros for main evolution loop
+// =========================================================================================================================
+
+#define SAVE_PARTICLE_TO_FILE(idx)                                                          \
+do {                                                                                        \
+    cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);          \
+    fname = PATH_OUT + "particle_" + frame_num(idx) + ".dat";                               \
+    save_binary(fname, particle, N_P);                                                      \
+} while(0)
+
+#define LOAD_PARTICLE_TO_VRAM(idx)                                                          \
+do {                                                                                        \
+    fname = PATH_OUT + "particle_" + frame_num(idx) + ".dat";                               \
+    if (!load_binary(fname, particle, N_P))                                                 \
+    {                                                                                       \
+        std::cerr << "Error: Failed to load file: " << fname << std::endl;                  \
+        return 1;                                                                           \
+    }                                                                                       \
+    cudaMemcpy(dev_particle, particle, sizeof(swarm)*N_P, cudaMemcpyHostToDevice);          \
+} while(0)
+
+#ifdef IMPORTGAS
+#define LOAD_GAS_DATA_TO_VRAM(idx)                                                          \
+do {                                                                                        \
+    if (!load_gas_data(PATH_OUT, idx, gasdens, gasvelx, gasvely, gasvelz))                  \
+    {                                                                                       \
+        std::cerr << "Error: Failed to load gas data files for frame " << idx << std::endl; \
+        return 1;                                                                           \
+    }                                                                                       \
+    cudaMemcpy(dev_gasdens, gasdens, sizeof(real)*N_G, cudaMemcpyHostToDevice);             \
+    cudaMemcpy(dev_gasvelx, gasvelx, sizeof(real)*N_G, cudaMemcpyHostToDevice);             \
+    cudaMemcpy(dev_gasvely, gasvely, sizeof(real)*N_G, cudaMemcpyHostToDevice);             \
+    cudaMemcpy(dev_gasvelz, gasvelz, sizeof(real)*N_G, cudaMemcpyHostToDevice);             \
+} while(0)
+#endif // IMPORTGAS
+
+#ifdef SAVE_DENS
+#define SAVE_DUSTDENS_TO_FILE(idx)                                                          \
+do {                                                                                        \
+    dustdens_init <<< NB_A, TPB >>> (dev_dustdens);                           \
+    dustdens_scat <<< NB_P, TPB >>> (dev_dustdens, dev_particle);             \
+    dustdens_calc <<< NB_A, TPB >>> (dev_dustdens);                           \
+    cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_G, cudaMemcpyDeviceToHost);           \
+    fname = PATH_OUT + "dustdens_" + frame_num(idx) + ".dat";                               \
+    save_binary(fname, dustdens, N_G);                                                      \
+} while(0)
+#endif // SAVE_DENS
+
+#if defined(TRANSPORT) && defined(RADIATION)
+#define SAVE_OPTDEPTH_TO_FILE(idx, do_avg)                                                  \
+do {                                                                                        \
+    optdepth_init <<< NB_A, TPB >>> (dev_optdepth);                           \
+    optdepth_scat <<< NB_P, TPB >>> (dev_optdepth, dev_particle);             \
+    optdepth_calc <<< NB_A, TPB >>> (dev_optdepth);                           \
+    optdepth_csum <<< NB_Y, TPB >>> (dev_optdepth);                           \
+    if (do_avg) optdepth_mean <<< NB_X, TPB >>> (dev_optdepth);               \
+    cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_G, cudaMemcpyDeviceToHost);           \
+    fname = PATH_OUT + "optdepth_" + frame_num(idx) + ".dat";                               \
+    save_binary(fname, optdepth, N_G);                                                      \
+} while(0)
+#endif // TRANSPORT && RADIATION
 
 // =========================================================================================================================
 // Console output macros (access local variables directly, no parameters needed)

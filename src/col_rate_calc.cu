@@ -31,7 +31,7 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col
 
         if (!(in_x && in_y && in_z)) return; // particle is out of bounds, do nothing
 
-        int idx_cell = static_cast<int>(loc_z)*NG_XY + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+        int idx_cell = static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
 
         // maximum search distance for KNN neighbor search defined by gas scale height
         real polar_R = dev_particle[idx_old_i].position.y*sin(dev_particle[idx_old_i].position.z);
@@ -40,25 +40,20 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col
         candidatelist query_result(max_search_dist);
         cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
 
-        real col_rate_ij = 0.0; // collision rate between particle i and j
-        real col_rate_i  = 0.0; // total collision rate for particle i
-
-        float dist2 = 0.0f;
+        real col_rate_i = 0.0; // total collision rate for particle i
         float max_dist2 = 0.0f;
-
-        int idx_old_j, idx_query;
 
         for(int j = 0; j < N_K; j++)
         {
-            col_rate_ij = 0.0;
-            idx_query = query_result.returnIndex(j);
+            real col_rate_ij = 0.0; // collision rate between particle i and j
+            int idx_query = query_result.returnIndex(j);
 
             if (idx_query != -1) // if the j-th nearest neighbor exists
             {
-                dist2 = query_result.returnDist2(j);
+                float dist2 = query_result.returnDist2(j);
                 max_dist2 = fmaxf(max_dist2, dist2);
                 
-                idx_old_j = dev_col_tree[idx_query].index_old;
+                int idx_old_j = dev_col_tree[idx_query].index_old;
                 col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(COAG_KERNEL)> (dev_particle, idx_old_i, idx_old_j);
             }
 

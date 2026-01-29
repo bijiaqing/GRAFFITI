@@ -140,11 +140,12 @@ real _get_loc_z (real z)
 // =========================================================================================================================
 
 __device__ __forceinline__
-real _get_grid_volume (int idx, real *y0_ptr = nullptr, real *dy_ptr = nullptr)
+real _get_grid_volume (int idx_cell, real *y0_ptr = nullptr, real *dy_ptr = nullptr)
 {
-    int idx_x = idx % N_X;
-    int idx_y = (idx % NG_XY - idx_x) / N_X;
-    int idx_z = (idx - idx_y*N_X - idx_x) / NG_XY;
+    // Convert 1D cell index to 3D grid indices
+    int idx_x = idx_cell % N_X;
+    int idx_y = (idx_cell / N_X) % N_Y;
+    int idx_z = idx_cell / (N_X*N_Y);
 
     bool enable_x = (N_X > 1);
     bool enable_z = (N_Z > 1);

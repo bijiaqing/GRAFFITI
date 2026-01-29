@@ -101,6 +101,7 @@ const real  V_FRAG      = 1.0;              // the fragmentation velocity for du
 // =========================================================================================================================
 // dust initialization parameters
 
+#ifndef IMPORTGAS
 const real INIT_XMIN    = X_MIN;            // minimum X boundary for particle initialization
 const real INIT_XMAX    = X_MAX;            // maximum X boundary for particle initialization
 
@@ -109,6 +110,7 @@ const real INIT_YMAX    = Y_MAX;            // maximum Y boundary for particle i
 
 const real INIT_ZMIN    = Z_MIN;            // minimum Z boundary for particle initialization
 const real INIT_ZMAX    = Z_MAX;            // maximum Z boundary for particle initialization
+#endif // NOT IMPORTGAS
 
 const real INIT_SMIN    = 1.0e+00;          // minimum grain size for particle initialization
 const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle initialization
@@ -174,16 +176,12 @@ struct tree_traits                          // traits for cukd::builder
 // =========================================================================================================================
 // cuda numerical parameters
 
-const int THREADS_PER_BLOCK = 32;               // number of threads per block
+const int TPB = 32; // number of threads per block
 
-const int NG_XY = N_X*N_Y;                      // number of grid cells in X-Y plane
-const int NG_XZ = N_X*N_Z;                      // number of grid cells in X-Z plane
-const int NG_YZ = N_Y*N_Z;                      // number of grid cells in Y-Z plane
-
-const int NB_P = N_P   / THREADS_PER_BLOCK + 1; // number of blocks for swarm-level parallelization
-const int NB_A = N_G   / THREADS_PER_BLOCK + 1; // number of blocks for cell-level  parallelization
-const int NB_X = NG_YZ / THREADS_PER_BLOCK + 1; // number of blocks for X-direction parallelization
-const int NB_Y = NG_XZ / THREADS_PER_BLOCK + 1; // number of blocks for Y-direction parallelization
+const int NB_P = N_P     / TPB + 1; // number of blocks for swarm-level parallelization
+const int NB_A = N_G     / TPB + 1; // number of blocks for cell-level  parallelization
+const int NB_X = N_Y*N_Z / TPB + 1; // number of blocks for X-direction parallelization
+const int NB_Y = N_X*N_Z / TPB + 1; // number of blocks for Y-direction parallelization
 
 // =========================================================================================================================
 

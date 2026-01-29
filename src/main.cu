@@ -18,7 +18,7 @@ std::mt19937 rand_generator;
 
 int main (int argc, char **argv)
 {
-    int idx_resume;
+    int idx_from;
     real clock_sim;   // total simulation time
     real clock_out;   // time accumulated toward the next output
     real dt_out;      // output timestep
@@ -46,7 +46,22 @@ int main (int argc, char **argv)
     cudaMallocHost((void**)&dustdens, sizeof(real)*N_G);
     cudaMalloc((void**)&dev_dustdens, sizeof(real)*N_G);
     #endif // SAVE_DENS
-
+    
+    #ifdef IMPORTGAS
+    real *gasdens, *dev_gasdens;
+    real *gasvelx, *dev_gasvelx;
+    real *gasvely, *dev_gasvely;
+    real *gasvelz, *dev_gasvelz;
+    cudaMallocHost((void**)&gasdens,  sizeof(real)*N_G);
+    cudaMallocHost((void**)&gasvelx,  sizeof(real)*N_G);
+    cudaMallocHost((void**)&gasvely,  sizeof(real)*N_G);
+    cudaMallocHost((void**)&gasvelz,  sizeof(real)*N_G);
+    cudaMalloc((void**)&dev_gasdens,  sizeof(real)*N_G);
+    cudaMalloc((void**)&dev_gasvelx,  sizeof(real)*N_G);
+    cudaMalloc((void**)&dev_gasvely,  sizeof(real)*N_G);
+    cudaMalloc((void**)&dev_gasvelz,  sizeof(real)*N_G);
+    #endif // IMPORTGAS
+    
     #if defined(TRANSPORT) && defined(RADIATION)
     real *optdepth, *dev_optdepth;
     cudaMallocHost((void**)&optdepth, sizeof(real)*N_G);
@@ -54,8 +69,6 @@ int main (int argc, char **argv)
     #endif // RADIATION
 
     #ifdef COLLISION
-    real max_rate; // Simple variable for max collision rate (thrust approach)
-
     bbox *dev_boundbox;
     cudaMalloc((void**)&dev_boundbox, sizeof(bbox));
 
@@ -65,11 +78,9 @@ int main (int argc, char **argv)
     curs *dev_rs_grids;
     cudaMalloc((void**)&dev_rs_grids, sizeof(curs)*N_G);
     
-    real *dev_col_rand, *dev_col_expt;
+    real *dev_col_rand, *dev_col_expt, *dev_col_rate;
     cudaMalloc((void**)&dev_col_rand, sizeof(real)*N_G);
     cudaMalloc((void**)&dev_col_expt, sizeof(real)*N_G);
-
-    real *dev_col_rate;
     cudaMalloc((void**)&dev_col_rate, sizeof(real)*N_G);
 
     int  *dev_col_flag;
@@ -83,13 +94,13 @@ int main (int argc, char **argv)
 
     if (argc <= 1) // no flag, fresh start
 	{
-        idx_resume = 0;
+        idx_from = 0;
 
         real *random_x, *dev_random_x;
         real *random_y, *dev_random_y;
         real *random_z, *dev_random_z;
         real *random_s, *dev_random_s;
-        
+
         cudaMallocHost((void**)&random_x, sizeof(real)*N_P); cudaMalloc((void**)&dev_random_x, sizeof(real)*N_P);
         cudaMallocHost((void**)&random_y, sizeof(real)*N_P); cudaMalloc((void**)&dev_random_y, sizeof(real)*N_P);
         cudaMallocHost((void**)&random_z, sizeof(real)*N_P); cudaMalloc((void**)&dev_random_z, sizeof(real)*N_P);
@@ -97,18 +108,35 @@ int main (int argc, char **argv)
 
         rand_generator.seed(0); // or use rand_generator.seed(std::time(NULL));
 
-        real idx_rho_g = IDX_P - 0.5*IDX_Q - 1.5;   // volumetric gas density power-law index
-        real idx_swarm = -0.5;                      // all swarms have an equal mass
+        #ifdef IMPORTGAS
+        LOAD_GAS_DATA_TO_VRAM(idx_from); // for gasdens, gasvelx, gasvely, gasvelz, and dev_*
 
+        real *epsilon;
+        cudaMallocHost((void**)&epsilon,  sizeof(real)*N_G);
+        
+        if (!load_epsilon(PATH_OUT, idx_from, epsilon))
+        {
+            std::cerr << "Error: Failed to load gas data files for frame " << idx << std::endl;
+            return 1;
+        }
+
+        // note: the current implementation only works for equal-size, equal-mass dust particles
+        rand_from_file(random_x, random_y, random_z, N_P, gasdens, epsilon);
+        
+        cudaFreeHost(epsilon);
+        #else // NOT IMPORTGAS
+        real idx_rho_g = IDX_P - 0.5*IDX_Q - 1.5;   // volumetric gas density power-law index
+
+        rand_uniform(random_x, N_P, INIT_XMIN, INIT_XMAX);
+        rand_convpow(random_y, N_P, INIT_YMIN, INIT_YMAX, idx_rho_g, 0.05*R_0, N_Y);
+        rand_uniform(random_z, N_P, INIT_ZMIN, INIT_ZMAX);
+        #endif // IMPORTGAS
+        
+        real idx_swarm = -0.5;                      // all swarms have an equal mass
         #if defined(TRANSPORT) && defined(RADIATION)
         // all swarms have an equal surface area, see _get_grain_number in initialize.cu
         idx_swarm = -1.5; 
         #endif // TRANSPORT && RADIATION
-
-        rand_uniform(random_x, N_P, INIT_XMIN, INIT_XMAX);
-        // rand_convpow(random_y, N_P, INIT_YMIN, INIT_YMAX, idx_rho_g, 0.05*R_0, N_Y);
-        rand_uniform(random_y, N_P, INIT_YMIN, INIT_YMAX);
-        rand_uniform(random_z, N_P, INIT_ZMIN, INIT_ZMAX);
         rand_pow_law(random_s, N_P, INIT_SMIN, INIT_SMAX, idx_swarm);
         // rand_4_linear(random_s, N_P);
 
@@ -117,7 +145,7 @@ int main (int argc, char **argv)
         cudaMemcpy(dev_random_z, random_z, sizeof(real)*N_P, cudaMemcpyHostToDevice);
         cudaMemcpy(dev_random_s, random_s, sizeof(real)*N_P, cudaMemcpyHostToDevice);
 
-        particle_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_random_x, dev_random_y, dev_random_z, dev_random_s);
+        particle_init <<< NB_P, TPB >>> (dev_particle, dev_random_x, dev_random_y, dev_random_z, dev_random_s);
 
         cudaFreeHost(random_x); cudaFree(dev_random_x);
         cudaFreeHost(random_y); cudaFree(dev_random_y);
@@ -125,102 +153,94 @@ int main (int argc, char **argv)
         cudaFreeHost(random_s); cudaFree(dev_random_s);
         
         #if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
-        rs_swarm_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rs_swarm);
+        rs_swarm_init <<< NB_P, TPB >>> (dev_rs_swarm);
         #endif // COLLISION or DIFFUSION
         
         #ifdef COLLISION
-        rs_grids_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rs_grids);
+        rs_grids_init <<< NB_A, TPB >>> (dev_rs_grids);
         #endif // COLLISION
 
         mkdir(PATH_OUT.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
         save_variable(PATH_OUT + "variables.txt");
 
         #if defined(TRANSPORT) && defined(RADIATION)
-        optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);                   // set all optical depth data to zero
-        optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);     // add particle contribution to cells
-        optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);                   // calculate the optical thickness of each cell
-        optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);                   // integrate in Y direction to get optical depth
-        optdepth_mean <<< NB_X, THREADS_PER_BLOCK >>> (dev_optdepth);                   // do azimuthal averaging for initial condition
-        cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_G, cudaMemcpyDeviceToHost);
-        fname = PATH_OUT + "optdepth_" + frame_num(idx_resume) + ".dat";
-        save_binary(fname, optdepth, N_G);
+        SAVE_OPTDEPTH_TO_FILE(idx_from, true);
         #endif // RADIATION
 
         #ifdef SAVE_DENS
-        dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // this process cannot be merged with the above
-        dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);     // because the weight in density and that in optical thickness
-        dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);                   // of each particle may differ
-        cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_G, cudaMemcpyDeviceToHost);
-        fname = PATH_OUT + "dustdens_" + frame_num(idx_resume) + ".dat";
-        save_binary(fname, dustdens, N_G);
+        SAVE_DUSTDENS_TO_FILE(idx_from);
         #endif // SAVE_DENS
 
-        cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);
-        fname = PATH_OUT + "particle_" + frame_num(idx_resume) + ".dat";
-        save_binary(fname, particle, N_P);
+        SAVE_PARTICLE_TO_FILE(idx_from);
 
         msg_output(0);
     }
     else
     {
         std::stringstream convert{argv[1]}; // read resume file number from input argument
-        if (!(convert >> idx_resume)) // set idx_resume by input argument, exit if failed
+        if (!(convert >> idx_from)) // set idx_from by input argument, exit if failed
         {
             std::cerr << "Error: Invalid resume file number: " << argv[1] << std::endl;
             return 1;
         }
 
-        fname = PATH_OUT + "particle_" + frame_num(idx_resume) + ".dat";
-        if (!load_binary(fname, particle, N_P)) // read particle data from file, exit if failed
-        {
-            std::cerr << "Error: Failed to load file: " << fname << std::endl;
-            return 1;
-        }
-        cudaMemcpy(dev_particle, particle, sizeof(swarm)*N_P,  cudaMemcpyHostToDevice);
+        LOAD_PARTICLE_TO_VRAM(idx_from);
+
+        #ifdef IMPORTGAS
+        LOAD_GAS_DATA_TO_VRAM(idx_from);
+        #endif // IMPORTGAS
 
         #if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
-        rs_swarm_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_rs_swarm);
+        rs_swarm_init <<< NB_P, TPB >>> (dev_rs_swarm);
         #endif // COLLISION or DIFFUSION
         
         #ifdef COLLISION
-        rs_grids_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_rs_grids);
+        rs_grids_init <<< NB_A, TPB >>> (dev_rs_grids);
         #endif // COLLISION
 
-        msg_output(idx_resume);
+        msg_output(idx_from);
     }
 
     #if defined(COLLISION) && !defined(TRANSPORT) // only need to build KD-tree once and can use it forever
-    col_tree_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_col_tree, dev_particle);
+    col_tree_init <<< NB_P, TPB >>> (dev_col_tree, dev_particle);
     cukd::buildTree <tree, tree_traits> (dev_col_tree, N_P, dev_boundbox);
     #endif // COLLISION but NO TRANSPORT
 
     #if !defined(TRANSPORT) && !defined(COLLISION)
-    std::cerr << "Error: No evolution module is enabled. Please enable TRANSPORT and/or COLLISION." << std::endl;
-    return 1;
+    {
+        std::cerr << "Error: No evolution module is enabled." << std::endl;
+        return 1;
+    }
     #endif // NO TRANSPORT and NO COLLISION
 
     #ifdef LOGTIMING
     #ifdef LOGOUTPUT
-    std::cerr << "Error: LOGTIMING and LOGOUTPUT cannot be enabled simultaneously." << std::endl;
-    return 1;
+    {
+        std::cerr << "Error: LOGTIMING and LOGOUTPUT cannot be enabled simultaneously." << std::endl;
+        return 1;
+    }
     #endif // LOGOUTPUT
     #ifdef TRANSPORT
-    std::cerr << "Error: LOGTIMING is not compatible with TRANSPORT module." << std::endl;
-    return 1;
+    {
+        std::cerr << "Error: LOGTIMING is not compatible with TRANSPORT module." << std::endl;
+        return 1;
+    }
     #endif // TRANSPORT
     #ifdef SAVE_DENS
-    std::cerr << "Error: LOGTIMING is not compatible with SAVE_DENS module." << std::endl;
-    return 1;
+    {
+        std::cerr << "Error: LOGTIMING is not compatible with SAVE_DENS module." << std::endl;
+        return 1;
+    }
     #endif // SAVE_DENS
     #endif // LOGTIMING
 
     #ifdef LOGTIMING
-    clock_sim = (idx_resume == 0) ? 0.0 : int_pow(LOG_BASE, idx_resume)*DT_OUT;
+    clock_sim = (idx_from == 0) ? 0.0 : int_pow(LOG_BASE, idx_from)*DT_OUT;
     #else  // LOGOUTPUT or LINEAR
-    clock_sim =                           static_cast<real>(idx_resume)*DT_OUT;
+    clock_sim =                         static_cast<real>(idx_from)*DT_OUT;
     #endif // LOGTIMING
 
-    for (int idx_file = idx_resume + 1; idx_file <= SAVE_MAX; idx_file++)
+    for (int idx_file = idx_from + 1; idx_file <= SAVE_MAX; idx_file++)
     {
         dt_out = _get_dt_out(idx_file);
         
@@ -243,18 +263,18 @@ int main (int argc, char **argv)
             }
 
             #ifdef RADIATION
-            ssa_substep_1 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
-            optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-            optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
-            optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-            optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
-            ssa_substep_2 <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_optdepth, dt_dyn);
+            ssa_substep_1 <<< NB_P, TPB >>> (dev_particle, dt_dyn);
+            optdepth_init <<< NB_A, TPB >>> (dev_optdepth);
+            optdepth_scat <<< NB_P, TPB >>> (dev_optdepth, dev_particle);
+            optdepth_calc <<< NB_A, TPB >>> (dev_optdepth);
+            optdepth_csum <<< NB_Y, TPB >>> (dev_optdepth);
+            ssa_substep_2 <<< NB_P, TPB >>> (dev_particle, dev_optdepth, dt_dyn);
             #else  // NO RADIATION
-            ssa_transport <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dt_dyn);
+            ssa_transport <<< NB_P, TPB >>> (dev_particle, dt_dyn);
             #endif // RADIATION
             
             #ifdef DIFFUSION
-            diffusion_pos <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dt_dyn);
+            diffusion_pos <<< NB_P, TPB >>> (dev_particle, dev_rs_swarm, dt_dyn);
             #endif // DIFFUSION
 
             cudaDeviceSynchronize();
@@ -276,19 +296,19 @@ int main (int argc, char **argv)
             clock_dyn = 0.0;
             
             // need to rebuild KD-tree for every dynamical timestep
-            col_tree_init <<< NB_P, THREADS_PER_BLOCK >>> (dev_col_tree, dev_particle);
+            col_tree_init <<< NB_P, TPB >>> (dev_col_tree, dev_particle);
             cukd::buildTree <tree, tree_traits> (dev_col_tree, N_P, dev_boundbox);
             #endif // TRANSPORT
         
             do // begin of while (clock_dyn < dt_dyn) or while (clock_out < dt_out)
             {
-                col_rate_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_rate, dev_col_expt, dev_col_rand);
-                col_rate_calc <<< NB_P, THREADS_PER_BLOCK >>> (dev_col_rate, dev_particle, dev_col_tree, dev_boundbox);
+                col_rate_init <<< NB_A, TPB >>> (dev_col_rate, dev_col_expt, dev_col_rand);
+                col_rate_calc <<< NB_P, TPB >>> (dev_col_rate, dev_particle, dev_col_tree, dev_boundbox);
                 
                 // use thrust to find maximum collision rate on device
                 thrust::device_ptr <const real> dev_ptr(dev_col_rate);
                 thrust::device_ptr <const real> max_ptr = thrust::max_element(dev_ptr, dev_ptr + N_G);
-                max_rate = *max_ptr; // dereference triggers single-value cudaMemcpy from device to host
+                real max_rate = *max_ptr; // dereference triggers single-value cudaMemcpy from device to host
                 
                 // Compute collisional timestep
                 dt_col = 1.0 / max_rate;
@@ -310,8 +330,8 @@ int main (int argc, char **argv)
                     break; // jump to transport, or file save, if dt_col is too small
                 }
 
-                col_flag_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_col_flag, dev_rs_grids, dev_col_rand, dev_col_rate, dt_col);
-                col_proc_exec <<< NB_P, THREADS_PER_BLOCK >>> (dev_particle, dev_rs_swarm, dev_col_expt, dev_col_rand, dev_col_flag, dev_col_tree, dev_boundbox);
+                col_flag_calc <<< NB_A, TPB >>> (dev_col_flag, dev_rs_grids, dev_col_rand, dev_col_rate, dt_col);
+                col_proc_exec <<< NB_P, TPB >>> (dev_particle, dev_rs_swarm, dev_col_expt, dev_col_rand, dev_col_flag, dev_col_tree, dev_boundbox);
 
                 cudaDeviceSynchronize();
 
@@ -343,45 +363,31 @@ int main (int argc, char **argv)
 
         } while (clock_out < dt_out);
 
+        #ifdef IMPORTGAS
+        LOAD_GAS_DATA_TO_VRAM(idx_file);
+        #endif // IMPORTGAS
+
         #if defined(TRANSPORT) && defined(RADIATION)
-        optdepth_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-        optdepth_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_optdepth, dev_particle);
-        optdepth_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_optdepth);
-        optdepth_csum <<< NB_Y, THREADS_PER_BLOCK >>> (dev_optdepth);
-        cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_G, cudaMemcpyDeviceToHost);
-        fname = PATH_OUT + "optdepth_" + frame_num(idx_file) + ".dat";
-        save_binary(fname, optdepth, N_G);
+        SAVE_OPTDEPTH_TO_FILE(idx_file, false);
         #endif // RADIATION
     
         #ifdef SAVE_DENS
-        dustdens_init <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
-        dustdens_scat <<< NB_P, THREADS_PER_BLOCK >>> (dev_dustdens, dev_particle);
-        dustdens_calc <<< NB_A, THREADS_PER_BLOCK >>> (dev_dustdens);
-        cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_G, cudaMemcpyDeviceToHost);
-        fname = PATH_OUT + "dustdens_" + frame_num(idx_file) + ".dat";
-        save_binary(fname, dustdens, N_G);
+        SAVE_DUSTDENS_TO_FILE(idx_file);
         #endif // SAVE_DENS
 
         #ifdef LOGTIMING
-        // both evolution and output are allowed in logarithmic time steps
-        cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);
-        fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
-        save_binary(fname, particle, N_P);
+        {
+            SAVE_PARTICLE_TO_FILE(idx_file);
+        }
         #elif defined(LOGOUTPUT)
-        // only output is allowed in logarithmic time steps
         if (is_log_power(idx_file))
         {
-            cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);
-            fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
-            save_binary(fname, particle, N_P);
+            SAVE_PARTICLE_TO_FILE(idx_file);
         }
         #else
-        // linear output
         if (idx_file % LIN_BASE == 0)
         {
-            cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);
-            fname = PATH_OUT + "particle_" + frame_num(idx_file) + ".dat";
-            save_binary(fname, particle, N_P);
+            SAVE_PARTICLE_TO_FILE(idx_file);
         }
         #endif // LOGTIMING
 
