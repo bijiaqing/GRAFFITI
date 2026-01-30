@@ -3,113 +3,9 @@
 
 #include "const.cuh"
 
-__device__ __forceinline__
-real _get_dust_mass (real s)
-{
-    return M_PI*RHO_0*s*s*s / 6.0;
-}
-
-__device__ __forceinline__
-real _get_omegaK (real R)
-{
-    return sqrt(G*M_S / R / R / R);
-}
-
-__device__ __forceinline__
-real _get_hgas (real R)
-{
-    return ASPR_0*pow(R / R_0, 0.5*(IDX_Q + 1.0));
-}
-
-__device__ __forceinline__
-real _get_cs (real R, real h_gas)
-{
-    return h_gas*_get_omegaK(R)*R;
-}
-
-__device__ __forceinline__
-real _get_eta (real R, real Z, real h)
-{
-    return -0.5*((IDX_P + 0.5*IDX_Q - 1.5)*h*h + IDX_Q*(1.0 - R / sqrt(R*R + Z*Z)));
-}
-
-#if defined(DIFFUSION) || defined(COLLISION)
-
-__device__ __forceinline__
-real _get_nu (real R, real h)
-{
-    real nu = 0.0;
-    
-    #ifndef CONST_NU
-    {
-        nu = ALPHA*h*h*R*R*_get_omegaK(R);
-    }
-    #else  // CONST_NU
-    {
-        nu = NU;
-    }
-    #endif // NOT CONST_NU
-    
-    return nu;
-}
-
-#endif // DIFFUSION || COLLISION
-
-#ifdef COLLISION
-
-__device__ __forceinline__
-real _get_sigma_gas (real R)
-{
-    return SIGMA_0*pow(R / R_0, IDX_P);
-}
-
-__device__ __forceinline__
-real _get_alpha (real R, real h)
-{
-    real alpha = 0.0;
-    
-    #ifndef CONST_NU
-    {
-        alpha = ALPHA;
-    }
-    #else  // CONST_NU
-    {
-        alpha = NU / (h*h*R*R*_get_omegaK(R));
-    }
-    #endif // NOT CONST_NU
-
-    return alpha;
-}
-
-__device__ __forceinline__
-real _get_hdust (real R, real St)
-{
-    // h_gas cannot be passed by a parameter here because _get_hdust is for individual particles
-    // whereas h_gas is, in most cases, evaluated at the midpoint between particles
-    
-    real h = _get_hgas(R);
-    real delta_Z = _get_nu(R, h) / SC_Z;
-    
-    return h*sqrt(delta_Z / (delta_Z + St));
-}
-
-#endif // COLLISION
-
-__device__ __forceinline__
-real _get_St (real R, real Z, real s, real h)
-{
-    real St = ST_0;
-    
-    St *= s / S_0;                      // scale with grain size
-    #ifndef CONST_ST
-    {
-        St /= pow(R / R_0, IDX_P);          // scale with radial   profile for gas density and sound speed
-        St /= exp(-Z*Z / (2.0*h*h*R*R));    // scale with vertical profile for gas density
-    }
-    #endif // NOT CONST_ST
-
-    return St;
-}
+#ifdef IMPORTGAS
+#include "helpers_gridfield.cuh"  // for _interp_field
+#endif
 
 // =========================================================================================================================
 // Shared Helper: Calculate grid cell indices
@@ -132,6 +28,121 @@ __device__ __forceinline__
 real _get_loc_z (real z)
 {
     return (N_Z > 1) ? (static_cast<real>(N_Z)*   (z - Z_MIN) /    (Z_MAX - Z_MIN)) : 0.0; 
+}
+
+// =========================================================================================================================
+// Shared Helper: Disk parameter calculations
+// Used by: ssa_substep_2, diffusion_pos, diffusion_vel, col_rate_calc, col_proc_exec
+// =========================================================================================================================
+
+__device__ __forceinline__
+real _get_grain_mass (real s)
+{
+    return M_PI*RHO_0*s*s*s / 6.0;
+}
+
+__device__ __forceinline__
+real _get_omegaK (real R)
+{
+    return sqrt(G*M_S / R / R / R);
+}
+
+__device__ __forceinline__
+real _get_hg (real R)
+{
+    return ASPR_0*pow(R / R_0, 0.5*(IDX_Q + 1.0));
+}
+
+__device__ __forceinline__
+real _get_cs (real R, real h_g)
+{
+    return h_g*_get_omegaK(R)*R;
+}
+
+__device__ __forceinline__
+real _get_eta (real R, real Z, real h_g)
+{
+    return -0.5*((IDX_P + 0.5*IDX_Q - 1.5)*h_g*h_g + IDX_Q*(1.0 - R / sqrt(R*R + Z*Z)));
+}
+
+#if defined(DIFFUSION) || defined(COLLISION)
+__device__ __forceinline__
+real _get_nu (real R, real h_g)
+{
+    #ifndef CONST_NU
+    return ALPHA*h_g*h_g*R*R*_get_omegaK(R);
+    #else  // CONST_NU
+    return NU;
+    #endif // NOT CONST_NU
+}
+#endif // DIFFUSION || COLLISION
+
+#ifdef COLLISION
+__device__ __forceinline__
+real _get_sigma_g (real R)
+{
+    return SIGMA_0*pow(R / R_0, IDX_P);
+}
+
+__device__ __forceinline__
+real _get_alpha (real R, real h_g)
+{
+    #ifndef CONST_NU
+    return ALPHA;
+    #else  // CONST_NU
+    return NU / (h_g*h_g*R*R*_get_omegaK(R));
+    #endif // NOT CONST_NU
+}
+
+__device__ __forceinline__
+real _get_hd (real R, real St)
+{
+    // h_g cannot be passed by a parameter here because _get_hd is for individual particles
+    // whereas h_g is, in most cases, evaluated at the midpoint between particles
+    
+    real h_g = _get_hg(R);
+    real delta_Z = _get_nu(R, h_g) / SC_Z;
+    
+    return h_g*sqrt(delta_Z / (delta_Z + St));
+}
+#endif // COLLISION
+
+__device__ __forceinline__
+real _get_St (real R, real Z, real s, real h_g
+    #ifdef IMPORTGAS
+    , real x, real y, real z, const real *dev_gasdens
+    #endif
+)
+{
+    real St = ST_0*(s / S_0);
+
+    #ifndef CONST_ST
+    #ifdef IMPORTGAS
+    if (dev_gasdens != nullptr)
+    {
+        // Use imported gas density
+        real loc_x = _get_loc_x(x);
+        real loc_y = _get_loc_y(y);
+        real loc_z = _get_loc_z(z);
+        
+        real rhog  = _interp_field(dev_gasdens, loc_x, loc_y, loc_z);
+        real rhog0 = SIGMA_0 / (sqrt(2.0*M_PI)*h_g*R);
+        
+        if (rhog > 0.0) 
+        {
+            St *= rhog0 / rhog;
+        }
+    }
+    else
+    #endif // IMPORTGAS
+    {
+        // Analytical gas density profile
+        St /= pow(R / R_0, IDX_P);              // scale with radial   profile for volumetric gas density and sound speed
+        St /= exp(-Z*Z / (2.0*h_g*h_g*R*R));    // scale with vertical profile for volumetric gas density
+    }
+    #endif // NOT CONST_ST
+
+    return St;
 }
 
 // =========================================================================================================================

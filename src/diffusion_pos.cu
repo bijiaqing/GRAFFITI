@@ -2,73 +2,104 @@
 
 #include "cudust_kern.cuh"
 #include "helpers_diskparam.cuh"
+#include "helpers_diffusion.cuh"
 
 // =========================================================================================================================
 // Kernel: diffusion_pos
 // Purpose: Apply turbulent diffusion effects to particle positions (radial and vertical)
 // Dependencies: cudust.cuh (for types and constants),
-//               helpers_diskparam.cuh (for _get_hgas, _get_nu),
+//               helpers_diskparam.cuh (for _get_hg, _get_nu),
+//               helpers_diffusion.cuh (for ),
 //               curand (for normal distribution random numbers)
 // =========================================================================================================================
 
 __global__
-void diffusion_pos (swarm *dev_particle, curs *dev_rs_swarm, real dt)
+void diffusion_pos (swarm *dev_particle, curs *dev_rs_swarm, real dt
+    #ifdef IMPORTGAS
+    , const real *dev_gasdens
+    #endif // IMPORTGAS
+)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
     if (idx < N_P)
     {
+        real x = dev_particle[idx].position.x;
         real y = dev_particle[idx].position.y;
         real z = dev_particle[idx].position.z;
 
-        real polar_R = y*sin(z);
-        real h_gas = _get_hgas(polar_R);
-        real nu = _get_nu(polar_R, h_gas);
+        real R = y*sin(z);
+        real Z = y*cos(z);
         
-        real coeff_R = nu / SC_R; // radial diffusion coefficient
-
-        // assuming sigma_g ~ pow(R, IDX_P), then
-        // (1) rho_g ~ sigma_g / H_gas ~ pow(R, IDX_P - 0.5*IDX_Q - 1.5)
-        // (2) d(rhog)/dR/rhog = (IDX_P - 0.5*IDX_Q - 1.5) / R
-        real avg_R1 = dt*coeff_R*(IDX_P - 0.5*IDX_Q - 1.5) / polar_R;
-        real var_R1 = dt*coeff_R*2.0;
-
-        #ifndef CONST_NU
-        // given nu ~ alpha*H_gas*c_s ~ pow(R, IDX_Q + 1.5), then d(coeff_R)/dR = (IDX_Q + 1.5)*coeff_R / R
-        real avg_R2 = dt*coeff_R*(IDX_Q + 1.5) / polar_R;
-        real var_R2 = avg_R2*avg_R2;
-        #else  // CONST_NU
-        real avg_R2 = 0.0;
-        real var_R2 = 0.0;
-        #endif // NOT CONST_NU
-
+        real h_g = _get_hg(R);
+        real nu = _get_nu(R, h_g);
+        
         curs rs_swarm = dev_rs_swarm[idx]; // use a local state for less global memory traffic 
 
-        real delta_R = (avg_R1 + avg_R2) + sqrt(var_R1 + var_R2)*curand_normal_double(&rs_swarm);
+        real delta_x = 0.0;
+        real delta_R = 0.0;
+        real delta_Z = 0.0;
 
-        if (N_Z == 1)
+        real term_x, term_R, term_Z;
+        
+        _get_term_grad_cyl(x, y, z, term_x, term_R, term_Z
+            #ifdef IMPORTGAS
+            , dev_gasdens
+            #endif // IMPORTGAS
+        );
+        
+        if (N_X > 1)
         {
-            dev_particle[idx].position.y = polar_R + delta_R;
+            real coeff_x = nu / SC_X;
+            
+            real avg_x1 = dt*coeff_x*term_x;
+            real var_x1 = dt*coeff_x*2.0;
+            
+            real avg_x2 = 0.0; // assuming both nu and alpha are constant in x-direction
+            real var_x2 = avg_x2*avg_x2;
+            
+            delta_x = (avg_x1 + avg_x2) + sqrt(var_x1 + var_x2)*curand_normal_double(&rs_swarm);
         }
-        else // Y-direction must exist, include vertical diffusion
+        
+        if (N_Y > 1)
         {
-            real polar_Z = y*cos(z);
-            real coeff_Z = nu / SC_Z;    // vertical diffusion coefficient
+            real coeff_R = nu / SC_R;
+            
+            real avg_R1 = dt*coeff_R*term_R;
+            real var_R1 = dt*coeff_R*2.0;
 
-            // assuming rho_g ~ exp(-Z^2 / (2*H_gas^2)), then
-            // (1) d(rhog)/dZ/rhog = -Z / H_gas^2
-            real avg_Z1 = dt*coeff_Z*(-polar_Z / (h_gas*h_gas*polar_R*polar_R));
+            #ifndef CONST_NU
+            // given nu ~ alpha*H_gas*c_s ~ pow(R, IDX_Q + 1.5), then d(coeff_R)/dR = (IDX_Q + 1.5)*coeff_R / R
+            real avg_R2 = dt*coeff_R*(IDX_Q + 1.5) / R;
+            #else  // CONST_NU
+            real avg_R2 = 0.0;
+            #endif // NOT CONST_NU
+            real var_R2 = avg_R2*avg_R2;
+
+            delta_R = (avg_R1 + avg_R2) + sqrt(var_R1 + var_R2)*curand_normal_double(&rs_swarm);
+        }
+
+        if (N_Z > 1)
+        {
+            real coeff_Z = nu / SC_Z;
+
+            real avg_Z1 = dt*coeff_Z*term_Z;
             real var_Z1 = dt*coeff_Z*2.0;
 
-            // assuming both nu and alpha are constant in Z-direction
-            real avg_Z2 = 0.0;
-            real var_Z2 = 0.0;
+            real avg_Z2 = 0.0; // assuming both nu and alpha are constant in Z-direction
+            real var_Z2 = avg_Z2*avg_Z2;
 
-            real delta_Z = (avg_Z1 + avg_Z2) + sqrt(var_Z1 + var_Z2)*curand_normal_double(&rs_swarm);
-
-            dev_particle[idx].position.y = sqrt((polar_R + delta_R)*(polar_R + delta_R) + (polar_Z + delta_Z)*(polar_Z + delta_Z));
-            dev_particle[idx].position.z = atan2(polar_R + delta_R, polar_Z + delta_Z);
+            delta_Z = (avg_Z1 + avg_Z2) + sqrt(var_Z1 + var_Z2)*curand_normal_double(&rs_swarm);
         }
+        
+        // ========== Update particle position ==========
+        real x_new = x + delta_x;
+        real R_new = R + delta_R;
+        real Z_new = Z + delta_Z;
+        
+        dev_particle[idx].position.x = x_new;
+        dev_particle[idx].position.y = sqrt(R_new*R_new + Z_new*Z_new);
+        dev_particle[idx].position.z = atan2(R_new, Z_new);
 
         dev_rs_swarm[idx] = rs_swarm; // update the global state, otherwise, always the same number
     }

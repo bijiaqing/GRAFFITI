@@ -6,7 +6,7 @@
 // =========================================================================================================================
 // Kernel: particle_init
 // Purpose: Initialize particle swarm positions, velocities, sizes, and grain numbers
-// Dependencies: helpers_diskparam.cuh (provides _get_dust_mass)
+// Dependencies: helpers_diskparam.cuh (provides _get_grain_mass)
 // =========================================================================================================================
 
 __device__ __forceinline__
@@ -53,10 +53,9 @@ real _get_grain_number (real size)
 
     // finally, combining (3) and (9), we know n_d(s)
 
-    real numr = M_D / N_P / RHO_0 / size / size / size; // for test only
-    // real numr = M_D / N_P / _get_dust_mass(size);
+    real numr = M_D / N_P / _get_grain_mass(size);
 
-    #ifdef RADIATION // keep total surface area for individual swarms the same
+    #if defined(TRANSPORT) && defined(RADIATION) // keep total surface area for individual swarms the same
     {
         if (INIT_SMIN != INIT_SMAX) // if min = max, converge back to the ordinary case
         {

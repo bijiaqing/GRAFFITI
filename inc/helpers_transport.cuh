@@ -4,6 +4,10 @@
 #include "const.cuh"
 #include "helpers_diskparam.cuh"
 
+#ifdef IMPORTGAS
+#include "helpers_gridfield.cuh"  // for _interp_field
+#endif
+
 __device__ __forceinline__
 void _load_particle (const swarm *dev_particle, int idx, real &x, real &y, real &z, real &lx, real &vy, real &lz)
 {
@@ -84,23 +88,49 @@ void _get_force_term (real y, real z, real R, real l_x, real l_z, real beta, rea
 
 __device__ __forceinline__
 void _ssa_substep_2 (real dt, real size, real beta, real lx_i, real vy_i, real lz_i, real x_1, real y_1, real z_1, 
-    real &x_j, real &y_j, real &z_j, real &lx_j, real &vy_j, real &lz_j)
+    real &x_j, real &y_j, real &z_j, real &lx_j, real &vy_j, real &lz_j
+    #ifdef IMPORTGAS
+    , const real *dev_gasvelx = nullptr, const real *dev_gasvely = nullptr, const real *dev_gasvelz = nullptr, const real *dev_gasdens = nullptr
+    #endif
+)
 {
     real polar_R_1 = y_1*sin(z_1);
     real polar_Z_1 = y_1*cos(z_1);
     
-    real h_gas = _get_hgas(polar_R_1);
+    real h_g = _get_hg(polar_R_1);
     real omega = _get_omegaK(polar_R_1);
-    real eta = _get_eta(polar_R_1, polar_Z_1, h_gas);
     
-    // get gas velocity in hydrostatic equilibrium for calculating the drag force
+    // get gas velocity for calculating the drag force
+    real lxg_1, vyg_1, lzg_1;
     
-    real lxg_1 = sqrt(1.0 - 2.0*eta)*omega*polar_R_1*polar_R_1;
-    real vyg_1 = 0.0;
-    real lzg_1 = 0.0;
+    #ifdef IMPORTGAS
+    if ((dev_gasvelx != nullptr) && (dev_gasvely != nullptr) && (dev_gasvelz != nullptr))
+    {
+        // Interpolate gas velocities from imported grid
+        real loc_x = _get_loc_x(x_1);
+        real loc_y = _get_loc_y(y_1);
+        real loc_z = _get_loc_z(z_1);
+        
+        lxg_1 = _interp_field(dev_gasvelx, loc_x, loc_y, loc_z)*y_1*sin(z_1);
+        vyg_1 = _interp_field(dev_gasvely, loc_x, loc_y, loc_z);
+        lzg_1 = _interp_field(dev_gasvelz, loc_x, loc_y, loc_z)*y_1;
+    }
+    else
+    #endif
+    {
+        real eta = _get_eta(polar_R_1, polar_Z_1, h_g);
+        
+        lxg_1 = sqrt(1.0 - 2.0*eta)*omega*polar_R_1*polar_R_1;
+        vyg_1 = 0.0;
+        lzg_1 = 0.0;
+    }
 
     // get the stopping time of dust for calculating the drag force
-    real ts_1 = _get_St(polar_R_1, polar_Z_1, size, h_gas) / omega;
+    real ts_1 = _get_St(polar_R_1, polar_Z_1, size, h_g
+        #ifdef IMPORTGAS
+        , x_1, y_1, z_1, dev_gasdens
+        #endif
+        ) / omega;
     real tau_1 = dt / ts_1;
 
     // updating the force terms to the first staggered step _1 using the position at _1 and velocity at _i

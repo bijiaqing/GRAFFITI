@@ -10,7 +10,11 @@
 // =========================================================================================================================
 
 __global__
-void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col_tree, const bbox *dev_boundbox)
+void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col_tree, const bbox *dev_boundbox
+    #ifdef IMPORTGAS
+    , const real *dev_gasdens
+    #endif
+)
 {
     // calculates the total collision rate for each cell, to help determine whether a collision is going to happen in the cell
     // it goes through each particle (i) and calculates the colision rate of it, then adds the rate to the corresponding cell
@@ -20,22 +24,22 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col
     if (idx_tree < N_P)
     {
         int idx_old_i = dev_col_tree[idx_tree].index_old;
+
+        real x = dev_particle[idx_old_i].position.x;
+        real y = dev_particle[idx_old_i].position.y;
+        real z = dev_particle[idx_old_i].position.z;
         
-        real loc_x = _get_loc_x(dev_particle[idx_old_i].position.x);
-        real loc_y = _get_loc_y(dev_particle[idx_old_i].position.y);
-        real loc_z = _get_loc_z(dev_particle[idx_old_i].position.z);
+        real loc_x = _get_loc_x(x);
+        real loc_y = _get_loc_y(y);
+        real loc_z = _get_loc_z(z);
 
-        bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
-        bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
-        bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
+        if (!_is_in_bounds(loc_x, loc_y, loc_z)) return; // particle is out of bounds, do nothing
 
-        if (!(in_x && in_y && in_z)) return; // particle is out of bounds, do nothing
-
-        int idx_cell = static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+        int idx_cell = _get_cell_index(loc_x, loc_y, loc_z);
 
         // maximum search distance for KNN neighbor search defined by gas scale height
-        real polar_R = dev_particle[idx_old_i].position.y*sin(dev_particle[idx_old_i].position.z);
-        float max_search_dist = static_cast<float>(_get_hgas(polar_R)*polar_R);
+        real R = y*sin(z);
+        float max_search_dist = static_cast<float>(_get_hg(R)*R);
         
         candidatelist query_result(max_search_dist);
         cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
@@ -54,7 +58,11 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col
                 max_dist2 = fmaxf(max_dist2, dist2);
                 
                 int idx_old_j = dev_col_tree[idx_query].index_old;
-                col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(COAG_KERNEL)> (dev_particle, idx_old_i, idx_old_j);
+                col_rate_ij = _get_col_rate_ij <static_cast<KernelType>(COAG_KERNEL)> (dev_particle, idx_old_i, idx_old_j
+                    #ifdef IMPORTGAS
+                    , dev_gasdens
+                    #endif
+                );
             }
 
             col_rate_i += col_rate_ij;

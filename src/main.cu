@@ -17,7 +17,8 @@ std::mt19937 rand_generator;
 // =========================================================================================================================
 
 int main (int argc, char **argv)
-{
+{   // pre-loop memory allocation
+    
     int idx_from;
     real clock_sim;   // total simulation time
     real clock_out;   // time accumulated toward the next output
@@ -92,8 +93,9 @@ int main (int argc, char **argv)
     cudaMalloc((void**)&dev_rs_swarm, sizeof(curs)*N_P);
     #endif // COLLISION or DIFFUSION
 
-    if (argc <= 1) // no flag, fresh start
-	{
+    if (argc <= 1)
+	{   // no argument input, start a new simulation with certain initial conditions
+        
         idx_from = 0;
 
         real *random_x, *dev_random_x;
@@ -176,7 +178,8 @@ int main (int argc, char **argv)
         msg_output(0);
     }
     else
-    {
+    {   // with argument input, resume from a previous simulation by loading data files
+
         std::stringstream convert{argv[1]}; // read resume file number from input argument
         if (!(convert >> idx_from)) // set idx_from by input argument, exit if failed
         {
@@ -241,7 +244,8 @@ int main (int argc, char **argv)
     #endif // LOGTIMING
 
     for (int idx_file = idx_from + 1; idx_file <= SAVE_MAX; idx_file++)
-    {
+    {   // parental loop over output files
+        
         dt_out = _get_dt_out(idx_file);
         
         clock_out = 0.0; // reset output clock
@@ -252,8 +256,9 @@ int main (int argc, char **argv)
 
         PRINT_TITLE_TO_SCREEN();
         
-        do // begin of while (clock_out < dt_out)
-        {
+        do  // begin of while (clock_out < dt_out)
+        {   // loop over dynamics timesteps within one output timestep
+            
             #ifdef TRANSPORT
             dt_dyn = fmin(DT_DYN, dt_out - clock_out);
             
@@ -268,9 +273,17 @@ int main (int argc, char **argv)
             optdepth_scat <<< NB_P, TPB >>> (dev_optdepth, dev_particle);
             optdepth_calc <<< NB_A, TPB >>> (dev_optdepth);
             optdepth_csum <<< NB_Y, TPB >>> (dev_optdepth);
-            ssa_substep_2 <<< NB_P, TPB >>> (dev_particle, dev_optdepth, dt_dyn);
+            ssa_substep_2 <<< NB_P, TPB >>> (dev_particle, dev_optdepth, dt_dyn
+                #ifdef IMPORTGAS
+                , dev_gasvelx, dev_gasvely, dev_gasvelz, dev_gasdens
+                #endif // IMPORTGAS
+            );
             #else  // NO RADIATION
-            ssa_transport <<< NB_P, TPB >>> (dev_particle, dt_dyn);
+            ssa_transport <<< NB_P, TPB >>> (dev_particle, dt_dyn
+                #ifdef IMPORTGAS
+                , dev_gasvelx, dev_gasvely, dev_gasvelz, dev_gasdens
+                #endif // IMPORTGAS
+            );
             #endif // RADIATION
             
             #ifdef DIFFUSION
@@ -300,10 +313,15 @@ int main (int argc, char **argv)
             cukd::buildTree <tree, tree_traits> (dev_col_tree, N_P, dev_boundbox);
             #endif // TRANSPORT
         
-            do // begin of while (clock_dyn < dt_dyn) or while (clock_out < dt_out)
-            {
+            do  // begin of while (clock_dyn < dt_dyn) or while (clock_out < dt_out)
+            {   // loop over collision calculations within one dynamics timestep or output timestep
+                
                 col_rate_init <<< NB_A, TPB >>> (dev_col_rate, dev_col_expt, dev_col_rand);
-                col_rate_calc <<< NB_P, TPB >>> (dev_col_rate, dev_particle, dev_col_tree, dev_boundbox);
+                col_rate_calc <<< NB_P, TPB >>> (dev_col_rate, dev_particle, dev_col_tree, dev_boundbox
+                    #ifdef IMPORTGAS
+                    , dev_gasdens
+                    #endif
+                );
                 
                 // use thrust to find maximum collision rate on device
                 thrust::device_ptr <const real> dev_ptr(dev_col_rate);
@@ -331,7 +349,11 @@ int main (int argc, char **argv)
                 }
 
                 col_flag_calc <<< NB_A, TPB >>> (dev_col_flag, dev_rs_grids, dev_col_rand, dev_col_rate, dt_col);
-                col_proc_exec <<< NB_P, TPB >>> (dev_particle, dev_rs_swarm, dev_col_expt, dev_col_rand, dev_col_flag, dev_col_tree, dev_boundbox);
+                col_proc_exec <<< NB_P, TPB >>> (dev_particle, dev_rs_swarm, dev_col_expt, dev_col_rand, dev_col_flag, dev_col_tree, dev_boundbox
+                    #ifdef IMPORTGAS
+                    , dev_gasdens
+                    #endif
+                );
 
                 cudaDeviceSynchronize();
 

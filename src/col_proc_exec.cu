@@ -11,7 +11,11 @@
 
 __global__
 void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt, 
-    const real *dev_col_rand, const int *dev_col_flag, const tree *dev_col_tree, const bbox *dev_boundbox)
+    const real *dev_col_rand, const int *dev_col_flag, const tree *dev_col_tree, const bbox *dev_boundbox
+    #ifdef IMPORTGAS
+    , const real *dev_gasdens
+    #endif
+)
 {
     // calculates the outcome of collision and update the property of the particle
     // if the collision flag of the cell that the particle is in is 1, it examines whether the particle is going to collide
@@ -23,20 +27,17 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
     {
         int idx_old_i = dev_col_tree[idx_tree].index_old;
 
-        real loc_x = _get_loc_x(dev_particle[idx_old_i].position.x);
-        real loc_y = _get_loc_y(dev_particle[idx_old_i].position.y);
-        real loc_z = _get_loc_z(dev_particle[idx_old_i].position.z);
+        real x = dev_particle[idx_old_i].position.x;
+        real y = dev_particle[idx_old_i].position.y;
+        real z = dev_particle[idx_old_i].position.z;
 
-        bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
-        bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
-        bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
+        real loc_x = _get_loc_x(x);
+        real loc_y = _get_loc_y(y);
+        real loc_z = _get_loc_z(z);
 
-        if (!(in_x && in_y && in_z))
-        {
-            return; // particle is out of bounds, do nothing
-        }
+        if (!_is_in_bounds(loc_x, loc_y, loc_z)) return; // particle is out of bounds, do nothing
 
-        int idx_cell = static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+        int idx_cell = _get_cell_index(loc_x, loc_y, loc_z);
 
         if (dev_col_flag[idx_cell] == 0)
         {
@@ -55,8 +56,8 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             curs rs_swarm = dev_rs_swarm[idx_old_i];
 
             // maximum search distance for KNN neighbor search defined by gas scale height
-            real polar_R = dev_particle[idx_old_i].position.y*sin(dev_particle[idx_old_i].position.z);
-            float max_search_dist = static_cast<float>(_get_hgas(polar_R)*polar_R);
+            real R = y*sin(z);
+            float max_search_dist = static_cast<float>(_get_hg(R)*R);
             
             candidatelist query_result(max_search_dist);
             cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
@@ -80,24 +81,32 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
                 if (idx_query != -1)
                 {   
                     idx_old_j = dev_col_tree[idx_query].index_old;
-                    col_expt_ij += _get_col_rate_ij<static_cast<KernelType>(COAG_KERNEL)>(dev_particle, idx_old_i, idx_old_j) / volume;
+                    col_expt_ij += _get_col_rate_ij<static_cast<KernelType>(COAG_KERNEL)>(dev_particle, idx_old_i, idx_old_j
+                        #ifdef IMPORTGAS
+                        , dev_gasdens
+                        #endif
+                    ) / volume;
                 }
 
                 j++;
             }
 
             real v_rel = 0.0;
-            // real v_rel = _get_vrel(dev_particle, idx_old_i, idx_old_j);
+            // real v_rel = _get_vrel(dev_particle, idx_old_i, idx_old_j
+            //     #ifdef IMPORTGAS
+            //     , dev_gasdens
+            //     #endif
+            // );
 
-            real size_i = dev_particle[idx_old_i].par_size;
-            real size_j = dev_particle[idx_old_j].par_size;
-            real size_k = cbrt(size_i*size_i*size_i + size_j*size_j*size_j);
+            real s_i = dev_particle[idx_old_i].par_size;
+            real s_j = dev_particle[idx_old_j].par_size;
+            real s_k = cbrt(s_i*s_i*s_i + s_j*s_j*s_j);
 
             if (v_rel <= V_FRAG)
             {
                 // collide with idx_old_j and MERGE
-                dev_particle[idx_old_i].par_size  = size_k;
-                dev_particle[idx_old_i].par_numr *= (size_i*size_i*size_i) / (size_k*size_k*size_k);
+                dev_particle[idx_old_i].par_size  = s_k;
+                dev_particle[idx_old_i].par_numr *= (s_i*s_i*s_i) / (s_k*s_k*s_k);
             }
             else
             {
@@ -117,10 +126,10 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
                 // so we draw a random number x from a uniform distribution between 0 and 1,
                 // put it in C^-1(x) will give a random s that satisfies the PDF P(s) = m(s)*n(s) / (si^3 + sj^3)
 
-                size_k *= rand*rand;
+                s_k *= rand*rand;
 
-                dev_particle[idx_old_i].par_size  = size_k;
-                dev_particle[idx_old_i].par_numr *= (size_i*size_i*size_i) / (size_k*size_k*size_k);
+                dev_particle[idx_old_i].par_size  = s_k;
+                dev_particle[idx_old_i].par_numr *= (s_i*s_i*s_i) / (s_k*s_k*s_k);
             }
 
             dev_rs_swarm[idx_old_i] = rs_swarm;

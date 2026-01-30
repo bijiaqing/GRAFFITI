@@ -83,16 +83,17 @@ const real  KAPPA_0     = 3.0e-28;          // the reference gray opacity of the
 #endif // RADIATION
 
 #if defined(TRANSPORT) && defined(DIFFUSION)
-const real  SC_R        = 1.0e+10;          // the Schmidt number for radial   diffusion
+const real  SC_R        = 1.0e+10;          // the Schmidt number for radial     diffusion
+const real  SC_X        = 1.0e+10;          // the Schmidt number for azimuthal  diffusion
 #endif // DIFFUSION
 
 #if (defined(TRANSPORT) && defined(DIFFUSION)) || defined(COLLISION)
-const real  SC_Z        = 1.0;              // the Schmidt number for vertical diffusion
+const real  SC_Z        = 1.0;              // the Schmidt number for vertical   diffusion
 #endif // DIFFUSION or COLLISION
 
 #ifdef COLLISION
 const int   COAG_KERNEL = 0;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
-const int   N_K         = 10;              // the maximum number for KNN neighbor search 
+const int   N_K         = 10;               // the maximum number for KNN neighbor search 
 
 const real  LAMBDA_0    = N_P / N_K / M_D;
 const real  V_FRAG      = 1.0;              // the fragmentation velocity for dust collision

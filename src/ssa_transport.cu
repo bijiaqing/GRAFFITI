@@ -10,7 +10,11 @@
 // =========================================================================================================================
 
 __global__
-void ssa_transport (swarm *dev_particle, real dt)
+void ssa_transport (swarm *dev_particle, real dt
+    #ifdef IMPORTGAS
+    , const real *dev_gasvelx, const real *dev_gasvely, const real *dev_gasvelz, const real *dev_gasdens
+    #endif
+)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
@@ -29,7 +33,11 @@ void ssa_transport (swarm *dev_particle, real dt)
         real size = dev_particle[idx].par_size;
         real beta = 0.0; // no radiation pressure
 
-        _ssa_substep_2(dt, size, beta, lx_i, vy_i, lz_i, x_1, y_1, z_1, x_j, y_j, z_j, lx_j, vy_j, lz_j);
+        _ssa_substep_2(dt, size, beta, lx_i, vy_i, lz_i, x_1, y_1, z_1, x_j, y_j, z_j, lx_j, vy_j, lz_j
+            #ifdef IMPORTGAS
+            , dev_gasvelx, dev_gasvely, dev_gasvelz, dev_gasdens
+            #endif
+        );
         _if_out_of_box(x_j, y_j, z_j, lx_j, vy_j, lz_j);
         _save_particle(dev_particle, idx, x_j, y_j, z_j, lx_j, vy_j, lz_j);
     }

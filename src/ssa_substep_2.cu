@@ -16,40 +16,32 @@
 __device__ __forceinline__
 real _get_optdepth (const real *dev_optdepth, real loc_x, real loc_y, real loc_z)
 {
+    if (loc_y < 0) return 0.0;
+    if (!_is_in_bounds(loc_x, loc_y, loc_z)) return DBL_MAX; // particle is out of bounds, return a large optical depth
+
+    int idx_cell = _get_cell_index(loc_x, loc_y, loc_z);
+    auto [next_x, next_y, next_z, frac_x, frac_y, frac_z] = _3d_interp_outer_y(loc_x, loc_y, loc_z);
+
     real optdepth = 0.0;
 
-    bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
-    bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
-    bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
-
-    if (in_x && in_y && in_z)
-    {
-        int idx_cell = static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
-        auto [next_x, next_y, next_z, frac_x, frac_y, frac_z] = _3d_interp_outer_y(loc_x, loc_y, loc_z);
-
-        optdepth += dev_optdepth[idx_cell                           ]*(1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z);
-        optdepth += dev_optdepth[idx_cell + next_x                  ]*       frac_x *(1.0 - frac_y)*(1.0 - frac_z);
-        optdepth += dev_optdepth[idx_cell          + next_y         ]*(1.0 - frac_x)*       frac_y *(1.0 - frac_z);
-        optdepth += dev_optdepth[idx_cell + next_x + next_y         ]*       frac_x *       frac_y *(1.0 - frac_z);
-        optdepth += dev_optdepth[idx_cell                   + next_z]*(1.0 - frac_x)*(1.0 - frac_y)*       frac_z ;
-        optdepth += dev_optdepth[idx_cell + next_x          + next_z]*       frac_x *(1.0 - frac_y)*       frac_z ;
-        optdepth += dev_optdepth[idx_cell          + next_y + next_z]*(1.0 - frac_x)*       frac_y *       frac_z ;
-        optdepth += dev_optdepth[idx_cell + next_x + next_y + next_z]*       frac_x *       frac_y *       frac_z ;
-    }
-    else if (loc_y < 0)
-    {
-        optdepth = 0;
-    }
-    else
-    {
-        optdepth = DBL_MAX;
-    }
+    optdepth += dev_optdepth[idx_cell                           ]*(1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z);
+    optdepth += dev_optdepth[idx_cell + next_x                  ]*       frac_x *(1.0 - frac_y)*(1.0 - frac_z);
+    optdepth += dev_optdepth[idx_cell          + next_y         ]*(1.0 - frac_x)*       frac_y *(1.0 - frac_z);
+    optdepth += dev_optdepth[idx_cell + next_x + next_y         ]*       frac_x *       frac_y *(1.0 - frac_z);
+    optdepth += dev_optdepth[idx_cell                   + next_z]*(1.0 - frac_x)*(1.0 - frac_y)*       frac_z ;
+    optdepth += dev_optdepth[idx_cell + next_x          + next_z]*       frac_x *(1.0 - frac_y)*       frac_z ;
+    optdepth += dev_optdepth[idx_cell          + next_y + next_z]*(1.0 - frac_x)*       frac_y *       frac_z ;
+    optdepth += dev_optdepth[idx_cell + next_x + next_y + next_z]*       frac_x *       frac_y *       frac_z ;
 
     return optdepth;
 }
 
 __global__
-void ssa_substep_2 (swarm *dev_particle, const real *dev_optdepth, real dt)
+void ssa_substep_2 (swarm *dev_particle, const real *dev_optdepth, real dt
+    #ifdef IMPORTGAS
+    , const real *dev_gasvelx, const real *dev_gasvely, const real *dev_gasvelz, const real *dev_gasdens
+    #endif
+)
 {
     int idx = threadIdx.x+blockDim.x*blockIdx.x;
 
@@ -72,7 +64,11 @@ void ssa_substep_2 (swarm *dev_particle, const real *dev_optdepth, real dt)
         real size = dev_particle[idx].par_size;
         real beta = BETA_0*exp(-optdepth) / (size / S_0);
 
-        _ssa_substep_2(dt, size, beta, lx_i, vy_i, lz_i, x_1, y_1, z_1, x_j, y_j, z_j, lx_j, vy_j, lz_j);
+        _ssa_substep_2(dt, size, beta, lx_i, vy_i, lz_i, x_1, y_1, z_1, x_j, y_j, z_j, lx_j, vy_j, lz_j
+            #ifdef IMPORTGAS
+            , dev_gasvelx, dev_gasvely, dev_gasvelz, dev_gasdens
+            #endif
+        );
         _if_out_of_box(x_j, y_j, z_j, lx_j, vy_j, lz_j);
         _save_particle(dev_particle, idx, x_j, y_j, z_j, lx_j, vy_j, lz_j);
     }

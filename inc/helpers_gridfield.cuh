@@ -2,7 +2,7 @@
 #define HELPERS_GRIDFIELD_CUH
 
 #include "const.cuh"
-#include "helpers_diskparam.cuh" // for _get_loc_x/y/z, _get_dust_mass, _get_grid_volume
+#include "helpers_diskparam.cuh" // for _get_loc_x/y/z, _get_grain_mass, _get_grid_volume
 
 // =========================================================================================================================
 // Grid field type definitions
@@ -16,11 +16,37 @@ struct interp                               // interpolation result for trilinea
 
 enum GridFieldType                          // field type for particle-to-grid scattering
 {
+    #ifdef SAVE_DENS
     DUSTDENS,                               // dust density field
-    #ifdef RADIATION
+    #endif // SAVE_DENS
+    #if defined(TRANSPORT) && defined(RADIATION)
     OPTDEPTH,                               // optical depth field
     #endif // RADIATION
 };
+
+// =========================================================================================================================
+// Helper: Check if position is within grid bounds
+// =========================================================================================================================
+
+__device__ __forceinline__
+bool _is_in_bounds (real loc_x, real loc_y, real loc_z)
+{
+    bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
+    bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
+    bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
+    
+    return in_x && in_y && in_z;
+}
+
+// =========================================================================================================================
+// Helper: Calculate grid cell index from grid coordinates
+// =========================================================================================================================
+
+__device__ __forceinline__
+int _get_cell_index (real loc_x, real loc_y, real loc_z)
+{
+    return static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+}
 
 // =========================================================================================================================
 // Trilinear interpolation helpers for grid field operations
@@ -206,47 +232,68 @@ interp _3d_interp_outer_y (real loc_x, real loc_y, real loc_z)
     return {next_x, next_y, next_z, frac_x, frac_y, frac_z};
 }
 
+#ifdef IMPORTGAS
+__device__ __forceinline__
+real _interp_field (const real *dev_field, real loc_x, real loc_y, real loc_z)
+{
+    if (!_is_in_bounds(loc_x, loc_y, loc_z)) return 0.0; // out of bounds, returns 0.0
+
+    int idx_cell = _get_cell_index(loc_x, loc_y, loc_z);
+    auto [next_x, next_y, next_z, frac_x, frac_y, frac_z] = _3d_interp_midpt_y(loc_x, loc_y, loc_z);
+
+    real value = 0.0;
+
+    value += dev_field[idx_cell                           ]*(1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z);
+    value += dev_field[idx_cell + next_x                  ]*       frac_x *(1.0 - frac_y)*(1.0 - frac_z);
+    value += dev_field[idx_cell          + next_y         ]*(1.0 - frac_x)*       frac_y *(1.0 - frac_z);
+    value += dev_field[idx_cell + next_x + next_y         ]*       frac_x *       frac_y *(1.0 - frac_z);
+    value += dev_field[idx_cell                   + next_z]*(1.0 - frac_x)*(1.0 - frac_y)*       frac_z ;
+    value += dev_field[idx_cell + next_x          + next_z]*       frac_x *(1.0 - frac_y)*       frac_z ;
+    value += dev_field[idx_cell          + next_y + next_z]*(1.0 - frac_x)*       frac_y *       frac_z ;
+    value += dev_field[idx_cell + next_x + next_y + next_z]*       frac_x *       frac_y *       frac_z ;
+
+    return value;
+}
+#endif // IMPORTGAS
+
 // =========================================================================================================================
 // Grid field scattering operations
 // =========================================================================================================================
 
 template <GridFieldType field_type> __device__ __forceinline__
-void _particle_to_grid_core(real *dev_grid, const swarm *dev_particle, int idx)
+void _particle_to_grid_core (real *dev_grid, const swarm *dev_particle, int idx)
 {
     real loc_x = _get_loc_x(dev_particle[idx].position.x);
     real loc_y = _get_loc_y(dev_particle[idx].position.y);
     real loc_z = _get_loc_z(dev_particle[idx].position.z);
 
-    bool in_x = loc_x >= 0.0 && loc_x < static_cast<real>(N_X);
-    bool in_y = loc_y >= 0.0 && loc_y < static_cast<real>(N_Y);
-    bool in_z = loc_z >= 0.0 && loc_z < static_cast<real>(N_Z);
+    if (!_is_in_bounds(loc_x, loc_y, loc_z)) return; // particle is out of bounds, do nothing
 
-    if (!(in_x && in_y && in_z))
-    {
-        return; // particle is out of the grid, do nothing
-    }
-
-    int idx_cell = static_cast<int>(loc_z)*N_X*N_Y + static_cast<int>(loc_y)*N_X + static_cast<int>(loc_x);
+    int idx_cell = _get_cell_index(loc_x, loc_y, loc_z);
     auto [next_x, next_y, next_z, frac_x, frac_y, frac_z] = _3d_interp_midpt_y(loc_x, loc_y, loc_z);
 
     real size = dev_particle[idx].par_size;    
     real weight = 0.0;
 
-    #ifdef RADIATION
+    #if defined(TRANSPORT) && defined(RADIATION)
+    if (field_type == OPTDEPTH)
     {
-        if (field_type == OPTDEPTH)
-        {
-            weight  = _get_dust_mass(size);
-            weight *= dev_particle[idx].par_numr;
-            weight *= KAPPA_0*(S_0 / size); // cross section per unit mass
-        }
-        else
+        weight  = _get_grain_mass(size);
+        weight *= dev_particle[idx].par_numr;
+        weight *= KAPPA_0*(S_0 / size); // cross section per unit mass
     }
+    else
     #endif // RADIATION
+    #ifdef SAVE_DENS
     if (field_type == DUSTDENS)
     {
-        weight  = _get_dust_mass(size);
+        weight  = _get_grain_mass(size);
         weight *= dev_particle[idx].par_numr;
+    }
+    else
+    #endif // SAVE_DENS
+    {
+        return; // unknown field type, do nothing
     }
 
     atomicAdd(&dev_grid[idx_cell                           ], (1.0 - frac_x)*(1.0 - frac_y)*(1.0 - frac_z)*weight);

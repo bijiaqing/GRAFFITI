@@ -56,15 +56,16 @@ _INC = const.cuh             \
        cudust_host.cuh       \
        cudust_kern.cuh       \
        helpers_collision.cuh \
+	   helpers_diffusion.cuh \
        helpers_diskparam.cuh \
        helpers_gridfield.cuh \
        helpers_transport.cuh
 
 _OBJ = col_flag_calc.o \
        col_proc_exec.o \
-       col_tree_init.o \
        col_rate_calc.o \
        col_rate_init.o \
+	   col_tree_init.o \
        diffusion_pos.o \
        diffusion_vel.o \
        dustdens_calc.o \
