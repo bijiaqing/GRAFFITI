@@ -12,7 +12,7 @@
 __global__
 void ssa_transport (swarm *dev_particle, real dt
     #ifdef IMPORTGAS
-    , const real *dev_gasvelx, const real *dev_gasvely, const real *dev_gasvelz, const real *dev_gasdens
+    , const real *dev_gasdens, const real *dev_gasvelx, const real *dev_gasvely, const real *dev_gasvelz
     #endif
 )
 {
@@ -38,6 +38,7 @@ void ssa_transport (swarm *dev_particle, real dt
             , dev_gasvelx, dev_gasvely, dev_gasvelz, dev_gasdens
             #endif
         );
+
         _if_out_of_box(x_j, y_j, z_j, lx_j, vy_j, lz_j);
         _save_particle(dev_particle, idx, x_j, y_j, z_j, lx_j, vy_j, lz_j);
     }

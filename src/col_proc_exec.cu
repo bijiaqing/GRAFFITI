@@ -1,7 +1,9 @@
 #ifdef COLLISION
 
 #include "cudust_kern.cuh"
-#include "helpers_collision.cuh" 
+#include "helpers_paramgrid.cuh"  // for _get_loc_x/y/z, _is_in_bounds, _get_cell_index
+#include "helpers_paramphys.cuh"  // for _get_hg
+#include "helpers_collision.cuh"  // for candidatelist, KernelType, _get_col_rate_ij
 
 // =========================================================================================================================
 // Kernel: col_proc_exec

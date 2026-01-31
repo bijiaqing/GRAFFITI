@@ -53,13 +53,13 @@ __global__ void optdepth_mean (real *dev_optdepth);
 __global__ void ssa_substep_1 (swarm *dev_particle, real dt);
 __global__ void ssa_substep_2 (swarm *dev_particle, const real *dev_optdepth, real dt
     #ifdef IMPORTGAS
-    , const real *dev_gasvelx = nullptr, const real *dev_gasvely = nullptr, const real *dev_gasvelz = nullptr, const real *dev_gasdens = nullptr
+    , const real *dev_gasdens, const real *dev_gasvelx, const real *dev_gasvely, const real *dev_gasvelz
     #endif
 );
 #else  // NO RADIATION
 __global__ void ssa_transport (swarm *dev_particle, real dt
     #ifdef IMPORTGAS
-    , const real *dev_gasvelx, const real *dev_gasvely, const real *dev_gasvelz, const real *dev_gasdens
+    , const real *dev_gasdens, const real *dev_gasvelx, const real *dev_gasvely, const real *dev_gasvelz
     #endif
 );
 #endif // RADIATION
@@ -67,7 +67,11 @@ __global__ void ssa_transport (swarm *dev_particle, real dt
 // =========================================================================================================================
 
 #ifdef DIFFUSION
-__global__ void diffusion_pos (swarm *dev_particle, curs *dev_rs_swarm, real dt);
+__global__ void diffusion_pos (swarm *dev_particle, curs *dev_rs_swarm, real dt
+    #ifdef IMPORTGAS
+    , const real *dev_gasdens
+    #endif
+);
 __global__ void diffusion_vel (swarm *dev_particle, curs *dev_rs_swarm, real dt);
 #endif // DIFFUSION
 #endif // TRANSPORT

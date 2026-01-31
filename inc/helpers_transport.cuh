@@ -2,12 +2,17 @@
 #define HELPERS_TRANSPORT_CUH
 
 #include "const.cuh"
-#include "helpers_diskparam.cuh"
+#include "helpers_paramgrid.cuh"
+#include "helpers_interpval.cuh"
+#include "helpers_paramphys.cuh"
 
-#ifdef IMPORTGAS
-#include "helpers_gridfield.cuh"  // for _interp_field
-#endif
+// =========================================================================================================================
+// Transport Helper Functions (Orders 0-4)
+// Purpose: Particle state I/O and SSA (Semi-implicit Symplectic Algorithm) integration
+// =========================================================================================================================
 
+// Order: O0 | Dependencies: None (only swarm struct access)
+// Purpose: Load particle position and velocity from device memory
 __device__ __forceinline__
 void _load_particle (const swarm *dev_particle, int idx, real &x, real &y, real &z, real &lx, real &vy, real &lz)
 {
@@ -19,6 +24,8 @@ void _load_particle (const swarm *dev_particle, int idx, real &x, real &y, real 
     lz = dev_particle[idx].velocity.z;
 }
 
+// Order: O0 | Dependencies: None (only swarm struct access)
+// Purpose: Save particle position and velocity to device memory
 __device__ __forceinline__
 void _save_particle (swarm *dev_particle, int idx, real x, real y, real z, real lx, real vy, real lz)
 {
@@ -30,6 +37,8 @@ void _save_particle (swarm *dev_particle, int idx, real x, real y, real z, real 
     dev_particle[idx].velocity.z = lz;
 }
 
+// Order: O1 | Dependencies: _get_omegaK [O0]
+// Purpose: Eject particle to outer radial boundary with Keplerian velocity
 __device__ __forceinline__
 void _eject_to_outer (real &y, real &z, real &lx, real &vy, real &lz)
 {
@@ -40,6 +49,8 @@ void _eject_to_outer (real &y, real &z, real &lx, real &vy, real &lz)
     lz = 0.0;
 }
 
+// Order: O2 | Dependencies: _eject_to_outer [O1]
+// Purpose: Enforce domain boundaries (periodic X, inner/outer Y, throw-out Z)
 __device__ __forceinline__
 void _if_out_of_box (real &x, real &y, real &z, real &lx, real &vy, real &lz)
 {
@@ -68,6 +79,8 @@ void _if_out_of_box (real &x, real &y, real &z, real &lx, real &vy, real &lz)
     }
 }
 
+// Order: O0 | Dependencies: None (only kinematic integration)
+// Purpose: SSA first half-step for position using initial velocity
 __device__ __forceinline__
 void _ssa_substep_1 (real dt, real x_i, real y_i, real z_i, real lx_i, real vy_i, real lz_i, 
     real &x_1, real &y_1, real &z_1)
@@ -78,6 +91,8 @@ void _ssa_substep_1 (real dt, real x_i, real y_i, real z_i, real lx_i, real vy_i
     x_1 = x_i + 0.5*lx_i*dt / y_i / y_1 / sin(z_i) / sin(z_1);
 }
 
+// Order: O1 | Dependencies: _get_omegaK [O0]
+// Purpose: Calculate gravitational and centrifugal force terms for SSA
 __device__ __forceinline__
 void _get_force_term (real y, real z, real R, real l_x, real l_z, real beta, real &F_y, real &Fc_y, real &Tc_z)
 {
@@ -86,19 +101,22 @@ void _get_force_term (real y, real z, real R, real l_x, real l_z, real beta, rea
     Tc_z = l_x*l_x / R / R / sin(z) * cos(z);
 }
 
+// Order: O4 | Dependencies: _get_hg [O0], _get_omegaK [O0], _get_eta [O0], _get_St [O3], _get_loc_x/y/z [O0], _interp_field [O2], _get_force_term [O1]
+// Flags: IMPORTGAS enables gas field interpolation for gas velocity and density
+// Purpose: SSA second half-step using drag force and gravity at midpoint
 __device__ __forceinline__
 void _ssa_substep_2 (real dt, real size, real beta, real lx_i, real vy_i, real lz_i, real x_1, real y_1, real z_1, 
     real &x_j, real &y_j, real &z_j, real &lx_j, real &vy_j, real &lz_j
     #ifdef IMPORTGAS
-    , const real *dev_gasvelx = nullptr, const real *dev_gasvely = nullptr, const real *dev_gasvelz = nullptr, const real *dev_gasdens = nullptr
+    , const real *dev_gasvelx, const real *dev_gasvely, const real *dev_gasvelz, const real *dev_gasdens
     #endif
 )
 {
-    real polar_R_1 = y_1*sin(z_1);
-    real polar_Z_1 = y_1*cos(z_1);
+    real R_1 = y_1*sin(z_1);
+    real Z_1 = y_1*cos(z_1);
     
-    real h_g = _get_hg(polar_R_1);
-    real omega = _get_omegaK(polar_R_1);
+    real h_g = _get_hg(R_1);
+    real omega = _get_omegaK(R_1);
     
     // get gas velocity for calculating the drag force
     real lxg_1, vyg_1, lzg_1;
@@ -118,15 +136,15 @@ void _ssa_substep_2 (real dt, real size, real beta, real lx_i, real vy_i, real l
     else
     #endif
     {
-        real eta = _get_eta(polar_R_1, polar_Z_1, h_g);
+        real eta = _get_eta(R_1, Z_1, h_g);
         
-        lxg_1 = sqrt(1.0 - 2.0*eta)*omega*polar_R_1*polar_R_1;
+        lxg_1 = sqrt(1.0 - 2.0*eta)*omega*R_1*R_1;
         vyg_1 = 0.0;
         lzg_1 = 0.0;
     }
 
     // get the stopping time of dust for calculating the drag force
-    real ts_1 = _get_St(polar_R_1, polar_Z_1, size, h_g
+    real ts_1 = _get_St(R_1, Z_1, size, h_g
         #ifdef IMPORTGAS
         , x_1, y_1, z_1, dev_gasdens
         #endif
@@ -135,7 +153,7 @@ void _ssa_substep_2 (real dt, real size, real beta, real lx_i, real vy_i, real l
 
     // updating the force terms to the first staggered step _1 using the position at _1 and velocity at _i
     real Fy_1, Fcy_1, Tcz_1;
-    _get_force_term(y_1, z_1, polar_R_1, lx_i, lz_i, beta, Fy_1, Fcy_1, Tcz_1);
+    _get_force_term(y_1, z_1, R_1, lx_i, lz_i, beta, Fy_1, Fcy_1, Tcz_1);
 
     // updating the velocity to the first staggered step _1 using force terms at _1
     real lx_1 = lx_i + (lxg_1 - lx_i)*(1.0 - exp(-0.5*tau_1));
@@ -146,7 +164,7 @@ void _ssa_substep_2 (real dt, real size, real beta, real lx_i, real vy_i, real l
     // this takes into account that beta is independent of velocity, so we can reuse it here
     // essentially, beta_2 = beta_1 and is unified as beta here
     real Fy_2, Fcy_2, Tcz_2;
-    _get_force_term(y_1, z_1, polar_R_1, lx_1, lz_1, beta, Fy_2, Fcy_2, Tcz_2);
+    _get_force_term(y_1, z_1, R_1, lx_1, lz_1, beta, Fy_2, Fcy_2, Tcz_2);
 
     // updating the velocity to the next time step _j
     lx_j = lx_i + (lxg_1 - lx_i)*(1.0 - exp(-tau_1));
@@ -161,4 +179,4 @@ void _ssa_substep_2 (real dt, real size, real beta, real lx_i, real vy_i, real l
 
 // =========================================================================================================================
 
-#endif // NOT HELPERS_TRANSPORT_CUH
+#endif // HELPERS_TRANSPORT_CUH

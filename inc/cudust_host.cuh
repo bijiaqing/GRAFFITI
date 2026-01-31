@@ -452,6 +452,7 @@ bool save_variable (const std::string &file_name)
     file << "KAPPA_0     = " << std::scientific     << std::setprecision(8) << KAPPA_0      << std::endl;
     #endif // RADIATION
     #if (defined(TRANSPORT) && defined(DIFFUSION))
+    file << "SC_X        = " << std::scientific     << std::setprecision(8) << SC_X         << std::endl;
     file << "SC_R        = " << std::scientific     << std::setprecision(8) << SC_R         << std::endl;
     #endif // DIFFUSION
     #if (defined(TRANSPORT) && defined(DIFFUSION)) || defined(COLLISION)
@@ -485,12 +486,14 @@ bool save_variable (const std::string &file_name)
     file                                                                                    << std::endl;
 
     // Initialization parameters
+    #ifndef IMPORTGAS
     file << "INIT_XMIN   = " << std::defaultfloat   << std::setprecision(8) << INIT_XMIN    << std::endl;
     file << "INIT_XMAX   = " << std::defaultfloat   << std::setprecision(8) << INIT_XMAX    << std::endl;
     file << "INIT_YMIN   = " << std::defaultfloat   << std::setprecision(8) << INIT_YMIN    << std::endl;
     file << "INIT_YMAX   = " << std::defaultfloat   << std::setprecision(8) << INIT_YMAX    << std::endl;
     file << "INIT_ZMIN   = " << std::defaultfloat   << std::setprecision(8) << INIT_ZMIN    << std::endl;
     file << "INIT_ZMAX   = " << std::defaultfloat   << std::setprecision(8) << INIT_ZMAX    << std::endl;
+    #endif // NOT IMPORTGAS
     file << "INIT_SMIN   = " << std::scientific     << std::setprecision(8) << INIT_SMIN    << std::endl;
     file << "INIT_SMAX   = " << std::scientific     << std::setprecision(8) << INIT_SMAX    << std::endl;
     file                                                                                    << std::endl;

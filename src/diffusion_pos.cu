@@ -1,15 +1,15 @@
 #if defined(TRANSPORT) && defined(DIFFUSION)
 
 #include "cudust_kern.cuh"
-#include "helpers_diskparam.cuh"
-#include "helpers_diffusion.cuh"
+#include "helpers_paramphys.cuh"  // for _get_hg, _get_nu
+#include "helpers_diffusion.cuh"  // for _get_term_grad_cyl
 
 // =========================================================================================================================
 // Kernel: diffusion_pos
 // Purpose: Apply turbulent diffusion effects to particle positions (radial and vertical)
 // Dependencies: cudust.cuh (for types and constants),
-//               helpers_diskparam.cuh (for _get_hg, _get_nu),
-//               helpers_diffusion.cuh (for ),
+//               helpers_paramphys.cuh (for _get_hg, _get_nu),
+//               helpers_diffusion.cuh (for _get_term_grad_cyl),
 //               curand (for normal distribution random numbers)
 // =========================================================================================================================
 

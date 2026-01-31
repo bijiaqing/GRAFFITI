@@ -1,12 +1,12 @@
 #ifdef SAVE_DENS
 
 #include "cudust_kern.cuh"
-#include "helpers_diskparam.cuh"
+#include "helpers_paramgrid.cuh"  // for _get_grid_volume
 
 // =========================================================================================================================
 // Kernel: dustdens_calc
 // Purpose: Normalize dust density by grid cell volume
-// Dependencies: helpers_diskparam.cuh (_get_grid_volume)
+// Dependencies: helpers_paramgrid.cuh (_get_grid_volume)
 // =========================================================================================================================
 
 __global__

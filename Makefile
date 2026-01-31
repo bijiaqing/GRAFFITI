@@ -1,88 +1,111 @@
+NVCC = nvcc
+
+#################################################################################################
+# Compile-time feature flags, uncomment lines below to enable specific physics modules			#
+#################################################################################################
+# physical features																				#
+#																								#
+# COLLISION: Enable dust collision and coagulation/fragmentation								#
+# NVCC += -DCOLLISION #																			#
+#																								#
+# TRANSPORT: Enable particle transport (position/velocity evolution) 							#
+# NOTE: If TRANSPORT is off, RADIATION and DIFFUSION are inactive regardless of their flags		#
+# NVCC += -DTRANSPORT #																			#
+#																								#
+# RADIATION: Enable radiation pressure calculations (optical depth, beta)						#
+# NVCC += -DRADIATION #																			#
+#																								#
+# DIFFUSION: Enable turbulent diffusion of dust particles										#
+# NVCC += -DDIFFUSION #																			#
+#																								#
+#################################################################################################
+# extra constraints																				#
+#																								#
+# CONST_NU: Use constant kinematic viscosity NU instead of alpha-viscosity						#
+# NVCC += -DCONST_NU #																			#
+#																								#
+# CONST_ST: Use constant Stokes number instead of constant physical size for dust particles		#
+# NVCC += -DCONST_ST #																			#
+#																								#
+#################################################################################################
+# file output features																			#
+#																								#
+# SAVE_DENS: Save dust density field to output files											#
+# NVCC += -DSAVE_DENS #																			#
+#																								#
+# LOGTIMING: Use dynamic, logarithmic time stepping for the simulation evolution				#
+# NVCC += -DLOGTIMING #																			#
+#																								#
+# LOGOUTPUT: Use logarithmic output intervals for particles with fixed output timesteps			#
+# NVCC += -DLOGOUTPUT #																			#
+#																								#
+#################################################################################################
+# numercial features																			#
+#																								#
+# CODE_UNIT: Use code units instead of cgs units												#
+# NVCC += -DCODE_UNIT #																			#
+#																								#
+# IMPORTGAS: Import gas disk parameters from external file instead of using analytical profiles	#
+# NVCC += -DIMPORTGAS #																			#
+#																								#
+#################################################################################################
+# platform-related features																		#
+#																								#
+# sm_80 is for A100 GPU																			#
+NVCC += -arch=sm_80 # 																			#
+#																								#
+# use fast math operations, which are less precise but faster									#
+NVCC += --use_fast_math #																		#
+#																								#
+# suppress some warnings																		#
+# 177: variable was declared but never referenced												#
+# 550: variable was set but never used															#
+NVCC += --diag-suppress 177,550 #																#
+#																								#
+#################################################################################################
+
 INC_DIR = ./inc
 OBJ_DIR = ./obj
 SRC_DIR = ./src
 OUT_DIR = ./out
 
-NVCC = nvcc
-# sm_80 is for A100 GPU
-NVCC += -arch=sm_80
-# use fast math operations, which are less precise but faster
-NVCC += --use_fast_math
-# suppress some warnings
-# 177: variable was declared but never referenced
-# 550: variable was set but never used
-NVCC += --diag-suppress 177,550
-
-# =========================================================================================================================
-# Compile-time feature flags
-# Uncomment lines below to enable specific physics modules
-
-# CODE_UNIT: Use code units instead of cgs units
-NVCC += -DCODE_UNIT
-
-# SAVE_DENS: Save dust density field to output files
-# NVCC += -DSAVE_DENS
-
-# LOGTIMING: Use dynamic, logarithmic time stepping for the simulation evolution
-NVCC += -DLOGTIMING
-
-# LOGOUTPUT: Use logarithmic output intervals for particles with fixed output timesteps
-# NVCC += -DLOGOUTPUT
-
-# COLLISION: Enable dust collision and coagulation/fragmentation
-NVCC += -DCOLLISION
-
-# TRANSPORT: Enable particle transport (position/velocity evolution)
-# NOTE: If TRANSPORT is off, RADIATION and DIFFUSION are inactive regardless of their flags
-# NVCC += -DTRANSPORT
-
-# RADIATION: Enable radiation pressure calculations (optical depth, beta)
-# NVCC += -DRADIATION
-
-# DIFFUSION: Enable turbulent diffusion of dust particles
-# NVCC += -DDIFFUSION
-
-# CONST_NU: Use constant kinematic viscosity NU instead of alpha-viscosity
-# NVCC += -DCONST_NU
-
-# CONST_ST: Use constant Stokes number instead of constant physical size for dust particles
-# NVCC += -DCONST_ST
-
-# =========================================================================================================================
-
 EXEC = cuDust
 
-_INC = const.cuh             \
-       cudust_host.cuh       \
-       cudust_kern.cuh       \
-       helpers_collision.cuh \
-	   helpers_diffusion.cuh \
-       helpers_diskparam.cuh \
-       helpers_gridfield.cuh \
-       helpers_transport.cuh
+_INC =						\
+	const.cuh				\
+	cudust_host.cuh			\
+	cudust_kern.cuh			\
+	helpers_collision.cuh	\
+	helpers_diffusion.cuh	\
+	helpers_interpval.cuh	\
+	helpers_paramgrid.cuh	\
+	helpers_paramphys.cuh	\
+	helpers_scatfield.cuh	\
+	helpers_transport.cuh
 
-_OBJ = col_flag_calc.o \
-       col_proc_exec.o \
-       col_rate_calc.o \
-       col_rate_init.o \
-	   col_tree_init.o \
-       diffusion_pos.o \
-       diffusion_vel.o \
-       dustdens_calc.o \
-       dustdens_init.o \
-       dustdens_scat.o \
-       main.o          \
-       optdepth_calc.o \
-       optdepth_csum.o \
-       optdepth_init.o \
-       optdepth_mean.o \
-       optdepth_scat.o \
-       particle_init.o \
-       rs_grids_init.o \
-       rs_swarm_init.o \
-       ssa_substep_1.o \
-       ssa_substep_2.o \
-       ssa_transport.o
+_OBJ =				\
+	col_flag_calc.o	\
+	col_proc_exec.o	\
+	col_rate_calc.o	\
+	col_rate_init.o	\
+	col_tree_init.o	\
+	diffusion_pos.o	\
+	diffusion_vel.o	\
+	dustdens_calc.o	\
+	dustdens_init.o	\
+	dustdens_scat.o	\
+	main.o			\
+	optdepth_calc.o	\
+	optdepth_csum.o	\
+	optdepth_init.o	\
+	optdepth_mean.o	\
+	optdepth_scat.o	\
+	particle_init.o	\
+	rs_grids_init.o	\
+	rs_swarm_init.o	\
+	ssa_substep_1.o	\
+	ssa_substep_2.o	\
+	ssa_transport.o
 
 INC = $(patsubst %, $(INC_DIR)/%, $(_INC))
 OBJ = $(patsubst %, $(OBJ_DIR)/%, $(_OBJ))

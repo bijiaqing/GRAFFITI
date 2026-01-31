@@ -1,12 +1,12 @@
 
 
 #include "cudust_kern.cuh"
-#include "helpers_diskparam.cuh"
+#include "helpers_paramphys.cuh"  // for _get_grain_mass
 
 // =========================================================================================================================
 // Kernel: particle_init
 // Purpose: Initialize particle swarm positions, velocities, sizes, and grain numbers
-// Dependencies: helpers_diskparam.cuh (provides _get_grain_mass)
+// Dependencies: helpers_paramphys.cuh (provides _get_grain_mass)
 // =========================================================================================================================
 
 __device__ __forceinline__

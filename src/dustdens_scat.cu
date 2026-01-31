@@ -1,12 +1,12 @@
 #ifdef SAVE_DENS
 
 #include "cudust_kern.cuh"
-#include "helpers_gridfield.cuh"
+#include "helpers_scatfield.cuh"
 
 // =========================================================================================================================
 // Kernel: dustdens_scat
 // Purpose: Scatter particle dust densities to grid using trilinear interpolation
-// Dependencies: helpers_gridfield.cuh (provides _particle_to_grid_core template)
+// Dependencies: helpers_scatfield.cuh (provides _particle_to_grid_core template)
 // =========================================================================================================================
 
 __global__

@@ -3,21 +3,23 @@
 
 #if defined(TRANSPORT) && defined(DIFFUSION)
 
-#include "const.cuh"
-
 #ifdef IMPORTGAS
-#include "helpers_gridfield.cuh"  // for _interp_field
-#else  // NO IMPORTGAS
-#include "helpers_diskparam.cuh"  // for _get_hg
+#include <cassert>
 #endif // IMPORTGAS
 
+#include "const.cuh"
+#include "helpers_paramgrid.cuh"
+#include "helpers_interpval.cuh"
+#include "helpers_paramphys.cuh"
+
 // =========================================================================================================================
-// Function: _get_term_grad_cyl
-// Purpose: Calculate the gradient terms in cylindrical coordinates needed for diffusion calculation
-// Dependencies: helpers_diskparam.cuh (for _get_hg),
-//               helpers_gridfield.cuh (for _interp_field) [if IMPORTGAS defined]
+// Diffusion Gradient Calculation (Order 3)
+// Purpose: Calculate density gradient terms for turbulent diffusion in cylindrical coordinates
 // =========================================================================================================================
 
+// Order: O3 | Dependencies: _get_loc_y/z [O0], _interp_field [O2]
+// Flags: Requires both TRANSPORT and DIFFUSION; IMPORTGAS enables gas density gradient
+// Purpose: Compute gradient terms (∂ρ/∂x, ∂ρ/∂R, ∂ρ/∂Z) for diffusion force calculation
 __device__ __forceinline__
 void _get_term_grad_cyl (real x, real y, real z, real &term_x, real &term_R, real &term_Z
     #ifdef IMPORTGAS
@@ -31,11 +33,8 @@ void _get_term_grad_cyl (real x, real y, real z, real &term_x, real &term_R, rea
 
     if (rho <= 0.0) // out of bounds or zero density
     {
-        term_x = 0.0;
-        term_R = 0.0;
-        term_Z = 0.0;
-        
-        return;
+        printf("ERROR: Invalid gas density rhog = %e at (x,y,z) = (%e,%e,%e)\n", rho, x, y, z);
+        assert(false);
     }
 
     real drho_dx, drho_dy, drho_dz;

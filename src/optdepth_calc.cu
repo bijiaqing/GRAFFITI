@@ -1,12 +1,12 @@
 #if defined(TRANSPORT) && defined(RADIATION)
 
 #include "cudust_kern.cuh"
-#include "helpers_diskparam.cuh"
+#include "helpers_paramgrid.cuh"  // for _get_grid_volume
 
 // =========================================================================================================================
 // Kernel: optdepth_calc
 // Purpose: Normalize optical depth by grid cell volume and prepare for radial integration
-// Dependencies: helpers_diskparam.cuh (_get_grid_volume)
+// Dependencies: helpers_paramgrid.cuh (_get_grid_volume)
 // =========================================================================================================================
 
 __global__

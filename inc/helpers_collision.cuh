@@ -6,13 +6,11 @@
 #include <cassert>      // for assert
 
 #include "const.cuh"
-#include "helpers_diskparam.cuh"
+#include "helpers_paramgrid.cuh"
+#include "helpers_interpval.cuh"
+#include "helpers_paramphys.cuh"
 
-#include "cukd/knn.h"       // for cukd::cct::knn, cukd::HeapCandidateList
-
-// =========================================================================================================================
-// Collision helper type definitions
-// =========================================================================================================================
+#include "cukd/knn.h"   // for cukd::cct::knn, cukd::HeapCandidateList
 
 using candidatelist = cukd::HeapCandidateList<N_K>;
 
@@ -23,6 +21,13 @@ enum KernelType {
     CUSTOM_KERNEL   = 3,
 };
 
+// =========================================================================================================================
+// Collision Helper Functions (Orders 0-5)
+// Purpose: Relative velocity components and collision kernel calculations
+// =========================================================================================================================
+
+// Order: O1 | Dependencies: _get_eta [O0], _get_omegaK [O0]
+// Purpose: Radial drift-induced relative velocity
 __device__ __forceinline__
 real _get_vrel_x (real R, real St_i, real St_j, real h_g)
 {
@@ -32,12 +37,16 @@ real _get_vrel_x (real R, real St_i, real St_j, real h_g)
     return abs(vrel_x);
 }
 
+// Order: O0 | Dependencies: None (direct velocity difference)
+// Purpose: Vertical velocity difference
 __device__ __forceinline__
 real _get_vrel_y (real vy_i, real vy_j)
 {
     return abs(vy_i - vy_j);
 }
 
+// Order: O3 | Dependencies: _get_hd [O2], _get_omegaK [O0]
+// Purpose: Vertical settling-induced relative velocity
 __device__ __forceinline__
 real _get_vrel_z (real R_i, real R_j, real St_i, real St_j)
 {
@@ -50,7 +59,9 @@ real _get_vrel_z (real R_i, real R_j, real St_i, real St_j)
 }
 
 #ifndef CODE_UNIT
-
+// Order: O2 | Dependencies: _get_cs [O1], _get_grain_mass [O0]
+// Flags: Only compiled in cgs units (not CODE_UNIT)
+// Purpose: Brownian motion-induced relative velocity
 __device__ __forceinline__
 real _get_vrel_b (real R, real s_i, real s_j, real h_g)
 {
@@ -66,9 +77,10 @@ real _get_vrel_b (real R, real s_i, real s_j, real h_g)
 
     return min(vrel_b, c_s);
 }
-
 #endif // NOT CODE_UNIT
 
+// Order: O2 | Dependencies: _get_sigma_g [O0], _get_alpha [O1]
+// Purpose: Calculate inverse sqrt of Reynolds number for turbulent relative velocity
 __device__ __forceinline__
 real _get_ReInvSqrt (real R, real alpha)
 {
@@ -85,6 +97,8 @@ real _get_ReInvSqrt (real R, real alpha)
     return 1.0 / sqrt(Re);
 }
 
+// Order: O3 | Dependencies: _get_cs [O1], _get_alpha [O1], _get_ReInvSqrt [O2]
+// Purpose: Turbulence-induced relative velocity (Ormel & Cuzzi 2007)
 __device__ __forceinline__
 real _get_vrel_t (real R, real St_i, real St_j, real h_g)
 {
@@ -116,7 +130,7 @@ real _get_vrel_t (real R, real St_i, real St_j, real h_g)
     real alpha = _get_alpha(R, h_g);
     real ReInvSqrt = _get_ReInvSqrt(R, alpha);
 
-    // v_gas^2 = 1.5*v_large^2 comes from normalizing the power spectrum    (page 415, section 3.2)
+    // comes from normalizing the power spectrum                            (page 415, section 3.2)
     real v_gas2 = 1.5*alpha*c_s*c_s;
 
     real St_large, St_small, eps;
@@ -206,6 +220,9 @@ real _get_vrel_t (real R, real St_i, real St_j, real h_g)
     return sqrt(vrel_sq);
 }
 
+// Order: O4 | Dependencies: _get_hg [O0], _get_St [O3], _get_vrel_x [O1], _get_vrel_y [O0], _get_vrel_z [O3], _get_vrel_b [O2], _get_vrel_t [O3]
+// Flags: IMPORTGAS enables gas density for Stokes number calculation
+// Purpose: Calculate total relative velocity from all sources (drift, settling, Brownian, turbulence)
 __device__ __forceinline__
 real _get_vrel (const swarm *dev_particle, int idx_old_i, int idx_old_j
     #ifdef IMPORTGAS
@@ -278,10 +295,12 @@ real _get_vrel (const swarm *dev_particle, int idx_old_i, int idx_old_j
 }
 
 // =========================================================================================================================
-// Shared Helper Function: Collision rate calculation for particle pair (template)
-// Used by: col_rate_calc, run_collision
+// Collision Rate Calculation (Order 5)
+// Purpose: Calculate collision rate between particle pair using coagulation kernel
 // =========================================================================================================================
 
+// Order: O5 | Dependencies: _get_grain_mass [O0], _get_vrel [O4]
+// Purpose: Compute collision rate λ_ij = N_j * K_ij for particle pair
 template <KernelType kernel> __device__ __forceinline__
 real _get_col_rate_ij (const swarm *dev_particle, int idx_old_i, int idx_old_j
     #ifdef IMPORTGAS

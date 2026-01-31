@@ -118,7 +118,7 @@ int main (int argc, char **argv)
         
         if (!load_epsilon(PATH_OUT, idx_from, epsilon))
         {
-            std::cerr << "Error: Failed to load gas data files for frame " << idx << std::endl;
+            std::cerr << "Error: Failed to load gas data files for frame " << idx_from << std::endl;
             return 1;
         }
 
@@ -275,19 +275,23 @@ int main (int argc, char **argv)
             optdepth_csum <<< NB_Y, TPB >>> (dev_optdepth);
             ssa_substep_2 <<< NB_P, TPB >>> (dev_particle, dev_optdepth, dt_dyn
                 #ifdef IMPORTGAS
-                , dev_gasvelx, dev_gasvely, dev_gasvelz, dev_gasdens
+                , dev_gasdens, dev_gasvelx, dev_gasvely, dev_gasvelz
                 #endif // IMPORTGAS
             );
             #else  // NO RADIATION
             ssa_transport <<< NB_P, TPB >>> (dev_particle, dt_dyn
                 #ifdef IMPORTGAS
-                , dev_gasvelx, dev_gasvely, dev_gasvelz, dev_gasdens
+                , dev_gasdens, dev_gasvelx, dev_gasvely, dev_gasvelz
                 #endif // IMPORTGAS
             );
             #endif // RADIATION
             
             #ifdef DIFFUSION
-            diffusion_pos <<< NB_P, TPB >>> (dev_particle, dev_rs_swarm, dt_dyn);
+            diffusion_pos <<< NB_P, TPB >>> (dev_particle, dev_rs_swarm, dt_dyn
+                #ifdef IMPORTGAS
+                , dev_gasdens
+                #endif // IMPORTGAS
+            );
             #endif // DIFFUSION
 
             cudaDeviceSynchronize();
