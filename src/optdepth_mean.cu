@@ -20,7 +20,7 @@ void optdepth_mean (real *dev_optdepth)
 
         real optdepth_sum = 0.0;
 
-        // summation in X direction
+        // sum in X direction
         // no race condition since each thread works on a unique X row
         for (int i = 0; i < N_X; i++)
         {

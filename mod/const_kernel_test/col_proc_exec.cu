@@ -71,6 +71,8 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             real radius = dev_particle[idx_old_i].max_dist;
             real volume = (4.0/3.0)*M_PI*radius*radius*radius;
 
+            volume = 1.0; // for testing purposes
+
             int idx_old_j, j = 0;
 
             // if particle idx_old_j *first* makes expt >= rand, it is the one that idx_old_i is going to collide with
@@ -91,11 +93,12 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
                 j++;
             }
 
-            real v_rel = _get_vrel(dev_particle, idx_old_i, idx_old_j
-                #ifdef IMPORTGAS
-                , dev_gasdens
-                #endif
-            );
+            real v_rel = 0.0;
+            // real v_rel = _get_vrel(dev_particle, idx_old_i, idx_old_j
+            //     #ifdef IMPORTGAS
+            //     , dev_gasdens
+            //     #endif
+            // );
 
             real s_i = dev_particle[idx_old_i].par_size;
             real s_j = dev_particle[idx_old_j].par_size;

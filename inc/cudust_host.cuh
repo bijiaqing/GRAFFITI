@@ -510,7 +510,6 @@ bool save_variable (const std::string &file_name)
     file << "DT_DYN      = " << std::scientific     << std::setprecision(8) << DT_DYN       << std::endl;
     #endif // TRANSPORT
     file << "DT_MIN      = " << std::scientific     << std::setprecision(8) << DT_MIN       << std::endl;
-    file << "PATH_OUT    = "                                                << PATH_OUT     << std::endl;
     file                                                                                    << std::endl;
 
     // Swarm structure as numpy dtype (configparser-compatible), in python, write as:
@@ -539,13 +538,13 @@ bool save_variable (const std::string &file_name)
 #define SAVE_PARTICLE_TO_FILE(idx)                                                          \
 do {                                                                                        \
     cudaMemcpy(particle, dev_particle, sizeof(swarm)*N_P, cudaMemcpyDeviceToHost);          \
-    fname = PATH_OUT + "particle_" + frame_num(idx) + ".dat";                               \
+    fname = PATH + "particle_" + frame_num(idx) + ".dat";                                   \
     save_binary(fname, particle, N_P);                                                      \
 } while(0)
 
 #define LOAD_PARTICLE_TO_VRAM(idx)                                                          \
 do {                                                                                        \
-    fname = PATH_OUT + "particle_" + frame_num(idx) + ".dat";                               \
+    fname = PATH + "particle_" + frame_num(idx) + ".dat";                                   \
     if (!load_binary(fname, particle, N_P))                                                 \
     {                                                                                       \
         std::cerr << "Error: Failed to load file: " << fname << std::endl;                  \
@@ -557,7 +556,7 @@ do {                                                                            
 #ifdef IMPORTGAS
 #define LOAD_GAS_DATA_TO_VRAM(idx)                                                          \
 do {                                                                                        \
-    if (!load_gas_data(PATH_OUT, idx, gasdens, gasvelx, gasvely, gasvelz))                  \
+    if (!load_gas_data(PATH, idx, gasdens, gasvelx, gasvely, gasvelz))                      \
     {                                                                                       \
         std::cerr << "Error: Failed to load gas data files for frame " << idx << std::endl; \
         return 1;                                                                           \
@@ -572,11 +571,11 @@ do {                                                                            
 #ifdef SAVE_DENS
 #define SAVE_DUSTDENS_TO_FILE(idx)                                                          \
 do {                                                                                        \
-    dustdens_init <<< NB_A, TPB >>> (dev_dustdens);                           \
-    dustdens_scat <<< NB_P, TPB >>> (dev_dustdens, dev_particle);             \
-    dustdens_calc <<< NB_A, TPB >>> (dev_dustdens);                           \
+    dustdens_init <<< NB_A, TPB >>> (dev_dustdens);                                         \
+    dustdens_scat <<< NB_P, TPB >>> (dev_dustdens, dev_particle);                           \
+    dustdens_calc <<< NB_A, TPB >>> (dev_dustdens);                                         \
     cudaMemcpy(dustdens, dev_dustdens, sizeof(real)*N_G, cudaMemcpyDeviceToHost);           \
-    fname = PATH_OUT + "dustdens_" + frame_num(idx) + ".dat";                               \
+    fname = PATH + "dustdens_" + frame_num(idx) + ".dat";                                   \
     save_binary(fname, dustdens, N_G);                                                      \
 } while(0)
 #endif // SAVE_DENS
@@ -584,13 +583,13 @@ do {                                                                            
 #if defined(TRANSPORT) && defined(RADIATION)
 #define SAVE_OPTDEPTH_TO_FILE(idx, do_avg)                                                  \
 do {                                                                                        \
-    optdepth_init <<< NB_A, TPB >>> (dev_optdepth);                           \
-    optdepth_scat <<< NB_P, TPB >>> (dev_optdepth, dev_particle);             \
-    optdepth_calc <<< NB_A, TPB >>> (dev_optdepth);                           \
-    optdepth_csum <<< NB_Y, TPB >>> (dev_optdepth);                           \
-    if (do_avg) optdepth_mean <<< NB_X, TPB >>> (dev_optdepth);               \
+    optdepth_init <<< NB_A, TPB >>> (dev_optdepth);                                         \
+    optdepth_scat <<< NB_P, TPB >>> (dev_optdepth, dev_particle);                           \
+    optdepth_calc <<< NB_A, TPB >>> (dev_optdepth);                                         \
+    optdepth_csum <<< NB_Y, TPB >>> (dev_optdepth);                                         \
+    if (do_avg) optdepth_mean <<< NB_X, TPB >>> (dev_optdepth);                             \
     cudaMemcpy(optdepth, dev_optdepth, sizeof(real)*N_G, cudaMemcpyDeviceToHost);           \
-    fname = PATH_OUT + "optdepth_" + frame_num(idx) + ".dat";                               \
+    fname = PATH + "optdepth_" + frame_num(idx) + ".dat";                                   \
     save_binary(fname, optdepth, N_G);                                                      \
 } while(0)
 #endif // TRANSPORT && RADIATION

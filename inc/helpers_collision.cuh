@@ -178,7 +178,7 @@ real _get_vrel_t (real R, real St_i, real St_j, real h_g)
         // regime 3: intermediate coupling (t_small < t_stop_large < 5*t_small)
         
         real coeff = 0.0;
-        // coefficient of delta_VI^2 following eq. 17
+        // coefficient of delta_VI^2  following eq. 17
         coeff  = (St_large - St_small) / (St_large + St_small);
         coeff *= (St_large / (1.0 + y_a) - St_small*St_small / (St_small + y_a*St_large));
         // coefficient of delta_VII^2 following eq. 18

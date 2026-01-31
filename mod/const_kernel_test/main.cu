@@ -128,18 +128,20 @@ int main (int argc, char **argv)
         
         cudaFreeHost(epsilon);
         #else // NOT IMPORTGAS
-        real idx_rho_g = IDX_P - 0.5*IDX_Q - 1.5; // volumetric gas density power-law index
+        real idx_rho_g = IDX_P - 0.5*IDX_Q - 1.5;   // volumetric gas density power-law index
 
         rand_uniform(random_x, N_P, INIT_XMIN, INIT_XMAX);
         rand_convpow(random_y, N_P, INIT_YMIN, INIT_YMAX, idx_rho_g, 0.05*R_0, N_Y);
         rand_uniform(random_z, N_P, INIT_ZMIN, INIT_ZMAX);
         #endif // IMPORTGAS
         
-        real idx_swarm = -0.5;  // all swarms have an equal mass
+        real idx_swarm = -0.5;                      // all swarms have an equal mass
         #if defined(TRANSPORT) && defined(RADIATION)
-        idx_swarm = -1.5;       // all swarms have an equal surface area, see _get_grain_number
+        // all swarms have an equal surface area, see _get_grain_number in initialize.cu
+        idx_swarm = -1.5; 
         #endif // TRANSPORT && RADIATION
         rand_pow_law(random_s, N_P, INIT_SMIN, INIT_SMAX, idx_swarm);
+        // rand_4_linear(random_s, N_P);
 
         cudaMemcpy(dev_random_x, random_x, sizeof(real)*N_P, cudaMemcpyHostToDevice);
         cudaMemcpy(dev_random_y, random_y, sizeof(real)*N_P, cudaMemcpyHostToDevice);

@@ -77,16 +77,40 @@ void particle_init (swarm *dev_particle,
 
     if (idx < N_P)
     {
-        dev_particle[idx].position.x = dev_random_x[idx];
-        dev_particle[idx].position.y = dev_random_y[idx];
-        dev_particle[idx].position.z = dev_random_z[idx];
+        int par_per_cell = N_P / N_G;
+        int residual = idx % par_per_cell;
+        int idx_cell = idx / par_per_cell;
+        
+        int idx_x = idx_cell % N_X;
+        int idx_y = (idx_cell / N_X) % N_Y;
+        int idx_z = idx_cell / (N_X*N_Y);
+
+        real dx =    (X_MAX - X_MIN)     / static_cast<real>(N_X);
+        real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
+        real dz =    (Z_MAX - Z_MIN)     / static_cast<real>(N_Z);
+
+        // position assignment within each cell
+        real idx_xx = static_cast<real>(idx_x) +  0.5;
+        real idx_yy = static_cast<real>(idx_y) + (0.5 + static_cast<real>(residual)) / static_cast<real>(par_per_cell);
+        real idx_zz = static_cast<real>(idx_z) +  0.5;
+
+        dev_particle[idx].position.x = X_MIN +     dx* idx_xx;
+        dev_particle[idx].position.y = Y_MIN * pow(dy, idx_yy);
+        dev_particle[idx].position.z = Z_MIN +     dz* idx_zz;
+        
+        // dev_particle[idx].position.x = dev_random_x[idx];
+        // dev_particle[idx].position.y = dev_random_y[idx];
+        // dev_particle[idx].position.z = dev_random_z[idx];
         
         dev_particle[idx].velocity.x = sqrt(G*M_S*dev_random_y[idx]); // specific angular momentum in azimuth
         dev_particle[idx].velocity.y = 0.0;
         dev_particle[idx].velocity.z = 0.0;
 
-        dev_particle[idx].par_size   = dev_random_s[idx];
-        dev_particle[idx].par_numr   = _get_grain_number(dev_random_s[idx]);
+        dev_particle[idx].par_size   = cbrt(6.0 / M_PI*dev_random_s[idx]);
+        dev_particle[idx].par_numr   = M_D / N_P / dev_random_s[idx]; // meaning m_bar = 1
+
+        // dev_particle[idx].par_size   = dev_random_s[idx];
+        // dev_particle[idx].par_numr   = _get_grain_number(dev_random_s[idx]);
 
         #ifdef COLLISION
         dev_particle[idx].col_rate   = 0.0;

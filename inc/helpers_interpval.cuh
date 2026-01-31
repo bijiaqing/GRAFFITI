@@ -12,8 +12,8 @@
 
 struct interp
 {
-    int  next_x, next_y, next_z;            // indices of the next grid cell in each direction
-    real frac_x, frac_y, frac_z;            // fractional distance to the next grid cell in each direction
+    int  next_x, next_y, next_z;    // indices of the next grid cell in each direction
+    real frac_x, frac_y, frac_z;    // fractional distance to the next grid cell in each direction
 };
 
 // =========================================================================================================================
@@ -110,22 +110,22 @@ void _1d_interp_y (real loc_y, real deci_y, real &frac_y, int &next_y, bool oute
         }
         else
         {
-            if (not edge_y) // still in the interior of the Y domain
+            if (not edge_y)         // still in the interior of the Y domain
             {
-                if (deci_y >= m_y) // share with the cell on the right
+                if (deci_y >= m_y)  // share with the cell on the right
                 {
                     frac_y = (pow(d_y, deci_y - m_y) - 1.0) / (d_y - 1.0);
-                    next_y = N_X; // the index distance to the next Y cell on the right is N_X
+                    next_y = N_X;   // the index distance to the next Y cell on the right is N_X
                 }
-                else // share with the cell on the left
+                else                // share with the cell on the left
                 {
                     frac_y = (pow(d_y, deci_y - m_y) - 1.0) / (1.0 / d_y - 1.0);
                     next_y = -N_X;
                 }
             }
-            else // at the Y domain boundaries
+            else                    // at the Y domain boundaries
             {
-                frac_y = 0.0; // the current cell take it all like N_Y = 1
+                frac_y = 0.0;       // the current cell take it all like N_Y = 1
                 next_y = 0;
             }
         }
@@ -136,22 +136,22 @@ void _1d_interp_y (real loc_y, real deci_y, real &frac_y, int &next_y, bool oute
 __device__ __forceinline__
 void _1d_interp_z (real loc_z, real deci_z, real &frac_z, int &next_z)
 {
-    if (N_Z == 1) // if there is only one cell in Z
+    if (N_Z == 1)                   // if there is only one cell in Z
     {
-        frac_z = 0.0; // the share for the current cell is '1.0 - frac_z'
-        next_z = 0;   // no other cells to share the particle
+        frac_z = 0.0;               // the share for the current cell is '1.0 - frac_z'
+        next_z = 0;                 // no other cells to share the particle
     }
     else
     {
         real m_z = 0.5;
         bool edge_z = loc_z < m_z || loc_z > static_cast<real>(N_Z) + m_z - 1.0;
         
-        if (not edge_z) // still in the interior of the Z domain
+        if (not edge_z)             // still in the interior of the Z domain
         {
             if (deci_z >= m_z)
             {
                 frac_z = deci_z - m_z;
-                next_z = N_X*N_Y; // the index distance to the next Z cell on the right is N_X*N_Y
+                next_z = N_X*N_Y;   // the index distance to the next Z cell on the right is N_X*N_Y
             }
             else
             {
@@ -159,7 +159,7 @@ void _1d_interp_z (real loc_z, real deci_z, real &frac_z, int &next_z)
                 next_z = -N_X*N_Y;
             }
         }
-        else // at the Z domain boundaries, the current cell take it all like N_Z = 1
+        else                        // at the Z domain boundaries, the current cell take it all like N_Z = 1
         {
             frac_z = 0.0;
             next_z = 0;

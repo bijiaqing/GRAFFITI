@@ -92,7 +92,6 @@ void diffusion_pos (swarm *dev_particle, curs *dev_rs_swarm, real dt
             delta_Z = (avg_Z1 + avg_Z2) + sqrt(var_Z1 + var_Z2)*curand_normal_double(&rs_swarm);
         }
         
-        // ========== Update particle position ==========
         real x_new = x + delta_x;
         real R_new = R + delta_R;
         real Z_new = Z + delta_Z;

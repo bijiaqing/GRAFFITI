@@ -73,6 +73,8 @@ void col_rate_calc (real *dev_col_rate, swarm *dev_particle, const tree *dev_col
         real radius = sqrtf(static_cast<real>(max_dist2));
         real volume = (4.0/3.0)*M_PI*radius*radius*radius;
 
+        volume = 1.0; // for testing purposes
+
         col_rate_i /= volume;
 
         dev_particle[idx_old_i].max_dist = radius;
