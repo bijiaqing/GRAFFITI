@@ -32,16 +32,16 @@ NVCC += -DCOLLISION #																			#
 # NVCC += -DSAVE_DENS #																			#
 #																								#
 # LOGTIMING: Use dynamic, logarithmic time stepping for the simulation evolution				#
-NVCC += -DLOGTIMING #																			#
+# NVCC += -DLOGTIMING #																			#
 #																								#
 # LOGOUTPUT: Use logarithmic output intervals for particles with fixed output timesteps			#
-# NVCC += -DLOGOUTPUT #																			#
+NVCC += -DLOGOUTPUT #																			#
 #																								#
 #################################################################################################
 # numercial features																			#
 #																								#
 # CODE_UNIT: Use code units instead of cgs units												#
-# NVCC += -DCODE_UNIT #																			#
+NVCC += -DCODE_UNIT #																			#
 #																								#
 # IMPORTGAS: Import gas disk parameters from external file instead of using analytical profiles	#
 # NVCC += -DIMPORTGAS #																			#
