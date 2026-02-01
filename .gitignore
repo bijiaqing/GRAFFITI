@@ -1,3 +1,5 @@
 .github/
-obj/
-out/
+obj/*
+!obj/.gitkeep
+out/*
+!out/.gitkeep
