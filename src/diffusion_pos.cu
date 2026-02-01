@@ -1,8 +1,8 @@
 #if defined(TRANSPORT) && defined(DIFFUSION)
 
-#include "graffiti_kern.cuh"
-#include "helpers_paramphys.cuh"  // for _get_hg, _get_nu
-#include "helpers_diffusion.cuh"  // for _get_term_grad_cyl
+#include <graffiti_kern.cuh>
+#include <helpers_paramphys.cuh>  // for _get_hg, _get_nu
+#include <helpers_diffusion.cuh>  // for _get_term_grad_cyl
 
 // =========================================================================================================================
 // Kernel: diffusion_pos

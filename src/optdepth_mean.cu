@@ -1,6 +1,6 @@
 #if defined(TRANSPORT) && defined(RADIATION)
 
-#include "graffiti_kern.cuh"
+#include <graffiti_kern.cuh>
 
 // =========================================================================================================================
 // Kernel: optdepth_mean

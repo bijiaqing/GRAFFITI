@@ -1,7 +1,7 @@
 #if defined(TRANSPORT) && defined(RADIATION)
 
-#include "graffiti_kern.cuh"
-#include "helpers_paramgrid.cuh"  // for _get_grid_volume
+#include <graffiti_kern.cuh>
+#include <helpers_paramgrid.cuh>  // for _get_grid_volume
 
 // =========================================================================================================================
 // Kernel: optdepth_calc

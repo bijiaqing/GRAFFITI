@@ -5,9 +5,9 @@
 #include <cassert>
 #endif // IMPORTGAS and not CONST_ST
 
-#include "const.cuh"
-#include "helpers_paramgrid.cuh"
-#include "helpers_interpval.cuh"
+#include <const.cuh>
+#include <helpers_paramgrid.cuh>
+#include <helpers_interpval.cuh>
 
 // =========================================================================================================================
 // Basic Disk Parameter Functions (Order 0)

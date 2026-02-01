@@ -1,7 +1,7 @@
 #ifndef HELPERS_PARAMGRID_CUH
 #define HELPERS_PARAMGRID_CUH
 
-#include "const.cuh"
+#include <const.cuh>
 
 // =========================================================================================================================
 // Grid Coordinate Conversion Functions

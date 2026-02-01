@@ -5,10 +5,10 @@
 
 #include <cassert>      // for assert
 
-#include "const.cuh"
-#include "helpers_paramgrid.cuh"
-#include "helpers_interpval.cuh"
-#include "helpers_paramphys.cuh"
+#include <const.cuh>
+#include <helpers_paramgrid.cuh>
+#include <helpers_interpval.cuh>
+#include <helpers_paramphys.cuh>
 
 #include "cukd/knn.h"   // for cukd::cct::knn, cukd::HeapCandidateList
 

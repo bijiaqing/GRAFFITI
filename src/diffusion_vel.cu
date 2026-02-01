@@ -1,6 +1,6 @@
 #if defined(TRANSPORT) && defined(DIFFUSION)
 
-#include "graffiti_kern.cuh"
+#include <graffiti_kern.cuh>
 
 // =========================================================================================================================
 // Kernel: diffusion_vel

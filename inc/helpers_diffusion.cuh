@@ -7,10 +7,10 @@
 #include <cassert>
 #endif // IMPORTGAS
 
-#include "const.cuh"
-#include "helpers_paramgrid.cuh"
-#include "helpers_interpval.cuh"
-#include "helpers_paramphys.cuh"
+#include <const.cuh>
+#include <helpers_paramgrid.cuh>
+#include <helpers_interpval.cuh>
+#include <helpers_paramphys.cuh>
 
 // =========================================================================================================================
 // Diffusion Gradient Calculation (Order 3)

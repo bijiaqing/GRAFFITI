@@ -1,7 +1,7 @@
 #ifndef GRAFFITI_KERN_CUH 
 #define GRAFFITI_KERN_CUH
 
-#include "const.cuh"
+#include <const.cuh>
 
 // =========================================================================================================================
 // Kernel declarations (organized by compiler flags)

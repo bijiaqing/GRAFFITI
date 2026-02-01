@@ -1,6 +1,6 @@
 #if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
 
-#include "graffiti_kern.cuh"
+#include <graffiti_kern.cuh>
 
 // =========================================================================================================================
 // Kernel: rs_swarm_init

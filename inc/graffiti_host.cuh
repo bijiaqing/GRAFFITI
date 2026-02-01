@@ -13,7 +13,7 @@
 #include <string>           // for std::string
 #include <vector>           // for std::vector
 
-#include "const.cuh"
+#include <const.cuh>
 
 // =========================================================================================================================
 // Random profile generation

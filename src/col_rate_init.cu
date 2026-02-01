@@ -1,6 +1,6 @@
 #ifdef COLLISION
 
-#include "graffiti_kern.cuh"
+#include <graffiti_kern.cuh>
 
 // =========================================================================================================================
 // Kernel: col_rate_init

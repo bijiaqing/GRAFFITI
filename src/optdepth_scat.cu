@@ -1,7 +1,7 @@
 #if defined(TRANSPORT) && defined(RADIATION)
 
-#include "graffiti_kern.cuh"
-#include "helpers_scatfield.cuh"
+#include <graffiti_kern.cuh>
+#include <helpers_scatfield.cuh>
 
 // =========================================================================================================================
 // Kernel: optdepth_scat

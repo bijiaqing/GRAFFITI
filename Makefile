@@ -93,16 +93,18 @@ endif
 
 all: $(EXEC)
 
-$(EXEC): $(OBJ)
+$(EXEC): $(OBJ) $(MOD_DIR)/flags.mk
+	@mkdir -p $(OUT_DIR)
 	@printf "%-12s %-20s %s\n" "Linking" "$@" "from $(words $(OBJ)) objects"
-	@$(NVCC) -o $@ $^
+	@$(NVCC) -o $@ $(OBJ)
 
 # Pattern rule for compiling .cu files
-$(OBJ_DIR)/%.o: %.cu
+$(OBJ_DIR)/%.o: %.cu $(MOD_DIR)/flags.mk
 	@mkdir -p $(dir $@)
 	@printf "%-12s %40s -> %s\n" "Compiling" "$(patsubst $(ROOT_DIR)/%,%,$<)" "$(notdir $@)"
-	@$(NVCC) --device-c -o $@ $< -I $(INC_DIR) \
+	@$(NVCC) --device-c -o $@ $< \
 		$(if $(wildcard $(MOD_DIR)),-I $(MOD_DIR),) \
+		-I $(INC_DIR) \
 		-DPATH_OUT=\"$(abspath $(OUT_DIR))/\" \
 		-MMD -MP -MF $(patsubst %.o,%.d,$@)
 

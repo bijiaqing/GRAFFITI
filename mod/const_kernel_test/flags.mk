@@ -41,7 +41,7 @@ NVCC += -DLOGTIMING #																			#
 # numercial features																			#
 #																								#
 # CODE_UNIT: Use code units instead of cgs units												#
-# NVCC += -DCODE_UNIT #																			#
+NVCC += -DCODE_UNIT #																			#
 #																								#
 # IMPORTGAS: Import gas disk parameters from external file instead of using analytical profiles	#
 # NVCC += -DIMPORTGAS #																			#

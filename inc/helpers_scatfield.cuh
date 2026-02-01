@@ -1,10 +1,10 @@
 #ifndef HELPERS_SCATFIELD_CUH
 #define HELPERS_SCATFIELD_CUH
 
-#include "const.cuh"
-#include "helpers_paramgrid.cuh"
-#include "helpers_interpval.cuh"
-#include "helpers_paramphys.cuh"
+#include <const.cuh>
+#include <helpers_paramgrid.cuh>
+#include <helpers_interpval.cuh>
+#include <helpers_paramphys.cuh>
 
 // =========================================================================================================================
 // Grid Field Scattering (Order 2)

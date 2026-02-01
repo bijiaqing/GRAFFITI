@@ -1,7 +1,7 @@
 #if defined(TRANSPORT) && defined(RADIATION)
 
-#include "graffiti_kern.cuh"
-#include "helpers_transport.cuh"
+#include <graffiti_kern.cuh>
+#include <helpers_transport.cuh>
 
 // =========================================================================================================================
 // Kernel: ssa_substep_1

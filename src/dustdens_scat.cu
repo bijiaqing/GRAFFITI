@@ -1,7 +1,7 @@
 #ifdef SAVE_DENS
 
-#include "graffiti_kern.cuh"
-#include "helpers_scatfield.cuh"
+#include <graffiti_kern.cuh>
+#include <helpers_scatfield.cuh>
 
 // =========================================================================================================================
 // Kernel: dustdens_scat

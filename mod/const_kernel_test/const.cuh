@@ -135,8 +135,6 @@ const int  LIN_BASE     = 1;                // save particle data every LIN_BASE
 
 const real DT_MIN       = 1.0e-14;          // calculation steps with smaller dt will be skipped
 
-const std::string PATH_OUT = "./out/";
-
 // =========================================================================================================================
 // structures
 

@@ -3,8 +3,8 @@
 
 #include <cfloat>                   // for DBL_MAX
 
-#include "const.cuh"
-#include "helpers_paramgrid.cuh"
+#include <const.cuh>
+#include <helpers_paramgrid.cuh>
 
 // =========================================================================================================================
 // Interpolation Data Structure
