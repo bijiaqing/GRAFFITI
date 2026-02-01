@@ -1,6 +1,6 @@
 #ifdef COLLISION
 
-#include "cudust_kern.cuh"
+#include "graffiti_kern.cuh"
 
 // =========================================================================================================================
 // Kernel: rs_grids_init

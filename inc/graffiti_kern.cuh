@@ -1,5 +1,5 @@
-#ifndef CUDUST_KERN_CUH 
-#define CUDUST_KERN_CUH
+#ifndef GRAFFITI_KERN_CUH 
+#define GRAFFITI_KERN_CUH
 
 #include "const.cuh"
 
@@ -78,4 +78,4 @@ __global__ void diffusion_vel (swarm *dev_particle, curs *dev_rs_swarm, real dt)
 
 // =========================================================================================================================
 
-#endif // NOT CUDUST_KERN_CUH
+#endif // NOT GRAFFITI_KERN_CUH

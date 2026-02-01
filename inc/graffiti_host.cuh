@@ -1,5 +1,5 @@
-#ifndef CUDUST_HOST_CUH 
-#define CUDUST_HOST_CUH
+#ifndef GRAFFITI_HOST_CUH 
+#define GRAFFITI_HOST_CUH
 
 #include <algorithm>        // for std::lower_bound
 #include <chrono>           // for std::chrono::system_clock
@@ -667,4 +667,4 @@ std::cout << std::endl;
 
 // =========================================================================================================================
 
-#endif // NOT CUDUST_HOST_CUH
+#endif // NOT GRAFFITI_HOST_CUH

@@ -1,6 +1,6 @@
 #if defined(TRANSPORT) && defined(RADIATION)
 
-#include "cudust_kern.cuh"
+#include "graffiti_kern.cuh"
 #include "helpers_transport.cuh"  // for _load_particle, _save_particle, _if_out_of_box, _ssa_substep_2
 #include "helpers_paramgrid.cuh"  // for _get_loc_x/y/z
 #include "helpers_interpval.cuh"  // for _interp_field

@@ -1,6 +1,6 @@
 #ifdef SAVE_DENS
 
-#include "cudust_kern.cuh"
+#include "graffiti_kern.cuh"
 
 // =========================================================================================================================
 // Kernel: dustdens_init

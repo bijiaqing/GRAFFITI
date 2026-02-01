@@ -1,6 +1,6 @@
 #ifdef SAVE_DENS
 
-#include "cudust_kern.cuh"
+#include "graffiti_kern.cuh"
 #include "helpers_paramgrid.cuh"  // for _get_grid_volume
 
 // =========================================================================================================================

@@ -8,8 +8,8 @@
 #include <thrust/extrema.h>     // for thrust::max_element
 #endif // COLLISION
 
-#include "cudust_kern.cuh"
-#include "cudust_host.cuh"
+#include "graffiti_kern.cuh"
+#include "graffiti_host.cuh"
 
 std::mt19937 rand_generator;
 
