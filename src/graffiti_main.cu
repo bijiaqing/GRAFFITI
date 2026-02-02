@@ -1,4 +1,5 @@
 #include <chrono>           // for std::chrono::system_clock
+#include <filesystem>       // for std::filesystem::create_directories
 #include <iomanip>          // for std::setw, std::setfill
 #include <iostream>         // for std::cout, std::endl
 #include <sstream>          // for std::stringstream
@@ -161,6 +162,7 @@ int main (int argc, char **argv)
         rs_grids_init <<< NB_A, TPB >>> (dev_rs_grids);
         #endif // COLLISION
 
+        std::filesystem::create_directories(PATH);
         save_variable(PATH + "variables.txt");
 
         #if defined(TRANSPORT) && defined(RADIATION)
