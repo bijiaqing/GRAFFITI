@@ -66,14 +66,11 @@ real _get_grid_volume (int idx_cell, real *y0_ptr = nullptr, real *dy_ptr = null
     int idx_x = idx_cell % N_X;
     int idx_y = (idx_cell / N_X) % N_Y;
     int idx_z = idx_cell / (N_X*N_Y);
-
-    bool enable_x = (N_X > 1);
-    bool enable_z = (N_Z > 1);
     
-    real idx_dim = static_cast<real>(enable_x) + static_cast<real>(enable_z) + 1.0;
+    real idx_dim = static_cast<real>(N_X > 1) + static_cast<real>(N_Z > 1) + 1.0;
 
     real dx = (X_MAX - X_MIN) / static_cast<real>(N_X);
-    real vol_x = enable_x ? dx : 1.0;
+    real vol_x = (N_X > 1) ? dx : 1.0;
     
     real dy = pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
     real y0 = Y_MIN*pow(dy, static_cast<real>(idx_y));
@@ -81,7 +78,7 @@ real _get_grid_volume (int idx_cell, real *y0_ptr = nullptr, real *dy_ptr = null
     
     real dz = (Z_MAX - Z_MIN) / static_cast<real>(N_Z);
     real z0 = Z_MIN + dz*static_cast<real>(idx_z);
-    real vol_z = enable_z ? (cos(z0) - cos(z0 + dz)) : 1.0;
+    real vol_z = (N_Z > 1) ? (cos(z0) - cos(z0 + dz)) : 1.0;
     
     if (y0_ptr) *y0_ptr = y0;
     if (dy_ptr) *dy_ptr = dy;

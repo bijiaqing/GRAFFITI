@@ -23,7 +23,7 @@ endif
 # NVCC base configuration (platform-specific flags)
 NVCC  = nvcc
 NVCC += -arch=sm_80
-NVCC += --use_fast_math
+NVCC += -O2 --use_fast_math
 NVCC += --diag-suppress 177,550
 
 ifdef MODEL

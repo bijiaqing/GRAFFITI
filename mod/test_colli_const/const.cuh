@@ -28,19 +28,19 @@ const real  S_0         = 1.0;              // the reference grain size of the d
 // =========================================================================================================================
 // mesh domain size and resolution
 
-const int   N_P         = 1e+07;            // total number of super-particles in the model
+const int   N_P         = 1e+06;            // total number of super-particles in the model
 
-const int   N_X         = 100;              // number of grid cells in X direction (azimuth)
+const int   N_X         = 20;              // number of grid cells in X direction (azimuth)
 const real  X_MIN       = -M_PI;            // minimum X boundary (azimuth)
 const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 
-const int   N_Y         = 100;              // number of grid cells in Y direction (radius)
+const int   N_Y         = 20;              // number of grid cells in Y direction (radius)
 const real  Y_MIN       = 0.5;              // minimum Y boundary (radius)
 const real  Y_MAX       = 1.5;              // maximum Y boundary (radius)
 
-const int   N_Z         = 1;                // number of grid cells in Z direction (colattitude)
-const real  Z_MIN       = 0.5*M_PI;         // minimum Z boundary (colattitude)
-const real  Z_MAX       = 0.5*M_PI;         // maximum Z boundary (colattitude)
+const int   N_Z         = 20;              // number of grid cells in Z direction (colattitude)
+const real  Z_MIN       = 0.5*M_PI - 0.2;   // minimum Z boundary (colattitude)
+const real  Z_MAX       = 0.5*M_PI + 0.2;   // maximum Z boundary (colattitude)
 
 const int   N_G         = N_X*N_Y*N_Z;      // total number of grid cells
 
@@ -54,9 +54,9 @@ const real  IDX_Q       = -0.4;             // the radial power-law index of the
 
 #if defined(COLLISION) || (defined(TRANSPORT) && defined(DIFFUSION))
 #ifndef CONST_NU
-const real  ALPHA       = 1.0e-04;          // the Shakura-Sunayev viscosity parameter of the gas
+const real  ALPHA       = 1.0e-02;          // the Shakura-Sunayev viscosity parameter of the gas
 #else  // CONST_NU
-const real  NU          = 1.0e-05;          // the kinematic viscosity parameter of the gas
+const real  NU          = 1.0e-04;          // the kinematic viscosity parameter of the gas
 #endif // NOT CONST_NU
 #endif // COLLISION or DIFFUSION
 
@@ -72,19 +72,19 @@ const real  RE_0        = 1.0e+08;          // reference Reynolds number at R_0
 // =========================================================================================================================
 // dust parameters for dynamics
 
-const real  ST_0        = 1.0e-03;          // the reference Stokes number of dust with the reference size
+const real  ST_0        = 1.0e-01;          // the reference Stokes number of dust with the reference size
 
 const real  M_D         = 1.0e30;           // the total dust mass in the disk, decoupled from M_S for flexibility
 const real  RHO_0       = 1.0;              // the reference internal density of the dust
 
 #if defined(TRANSPORT) && defined(RADIATION)
 const real  BETA_0      = 1.0e+01;          // the reference ratio between the radiation pressure and the gravity
-const real  KAPPA_0     = 1.0;              // the reference gray opacity of the dust
+const real  KAPPA_0     = 3.0e-28;          // the reference gray opacity of the dust
 #endif // RADIATION
 
 #if defined(TRANSPORT) && defined(DIFFUSION)
-const real  SC_R        = 1.0;              // the Schmidt number for radial     diffusion
-const real  SC_X        = 1.0;              // the Schmidt number for azimuthal  diffusion
+const real  SC_R        = 1.0e+10;          // the Schmidt number for radial     diffusion
+const real  SC_X        = 1.0e+10;          // the Schmidt number for azimuthal  diffusion
 #endif // DIFFUSION
 
 #if (defined(TRANSPORT) && defined(DIFFUSION)) || defined(COLLISION)
@@ -93,10 +93,9 @@ const real  SC_Z        = 1.0;              // the Schmidt number for vertical  
 
 #ifdef COLLISION
 const int   COAG_KERNEL = 0;                // coagulation kernels: 0 = constant, 1 = linear, 2 = product, 3 = custom
-const int   N_K         = 200;              // the maximum number for KNN neighbor search
+const int   N_K         = 200;              // the maximum number for KNN neighbor search 
 
-const real  H_SEARCH    = 1.0;              // KNN will only search within the distance of H_SEARCH*H_GAS
-const real  LAMBDA_0    = N_P / N_K / M_D;  // normalization factor for collision rate
+const real  LAMBDA_0    = N_P / N_K / M_D;
 const real  V_FRAG      = 1.0;              // the fragmentation velocity for dust collision
 #endif // COLLISION
 
@@ -120,7 +119,7 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const int  SAVE_MAX     = 100;                // total number of outputs for mesh fields
+const int  SAVE_MAX     = 8;                // total number of outputs for mesh fields
 
 const real DT_OUT       = 1.0;
 

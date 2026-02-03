@@ -30,17 +30,17 @@ const real  S_0         = 1.0;              // the reference grain size of the d
 
 const int   N_P         = 1e+07;            // total number of super-particles in the model
 
-const int   N_X         = 100;              // number of grid cells in X direction (azimuth)
-const real  X_MIN       = -M_PI;            // minimum X boundary (azimuth)
+const int   N_X         = 1;              // number of grid cells in X direction (azimuth)
+const real  X_MIN       = +M_PI;            // minimum X boundary (azimuth)
 const real  X_MAX       = +M_PI;            // maximum X boundary (azimuth)
 
-const int   N_Y         = 100;              // number of grid cells in Y direction (radius)
+const int   N_Y         = 200;              // number of grid cells in Y direction (radius)
 const real  Y_MIN       = 0.5;              // minimum Y boundary (radius)
 const real  Y_MAX       = 1.5;              // maximum Y boundary (radius)
 
-const int   N_Z         = 100;              // number of grid cells in Z direction (colattitude)
-const real  Z_MIN       = 0.5*M_PI - 0.2;   // minimum Z boundary (colattitude)
-const real  Z_MAX       = 0.5*M_PI + 0.2;   // maximum Z boundary (colattitude)
+const int   N_Z         = 100;                // number of grid cells in Z direction (colattitude)
+const real  Z_MIN       = 0.5*M_PI - 0.2;         // minimum Z boundary (colattitude)
+const real  Z_MAX       = 0.5*M_PI + 0.2;         // maximum Z boundary (colattitude)
 
 const int   N_G         = N_X*N_Y*N_Z;      // total number of grid cells
 
@@ -56,7 +56,7 @@ const real  IDX_Q       = -0.4;             // the radial power-law index of the
 #ifndef CONST_NU
 const real  ALPHA       = 1.0e-02;          // the Shakura-Sunayev viscosity parameter of the gas
 #else  // CONST_NU
-const real  NU          = 1.0e-04;          // the kinematic viscosity parameter of the gas
+const real  NU          = 1.0e-05;          // the kinematic viscosity parameter of the gas
 #endif // NOT CONST_NU
 #endif // COLLISION or DIFFUSION
 
@@ -72,19 +72,19 @@ const real  RE_0        = 1.0e+08;          // reference Reynolds number at R_0
 // =========================================================================================================================
 // dust parameters for dynamics
 
-const real  ST_0        = 1.0e-01;          // the reference Stokes number of dust with the reference size
+const real  ST_0        = 1.0e-04;          // the reference Stokes number of dust with the reference size
 
 const real  M_D         = 1.0e30;           // the total dust mass in the disk, decoupled from M_S for flexibility
 const real  RHO_0       = 1.0;              // the reference internal density of the dust
 
 #if defined(TRANSPORT) && defined(RADIATION)
 const real  BETA_0      = 1.0e+01;          // the reference ratio between the radiation pressure and the gravity
-const real  KAPPA_0     = 3.0e-28;          // the reference gray opacity of the dust
+const real  KAPPA_0     = 1.0;              // the reference gray opacity of the dust
 #endif // RADIATION
 
 #if defined(TRANSPORT) && defined(DIFFUSION)
-const real  SC_R        = 1.0e+10;          // the Schmidt number for radial     diffusion
-const real  SC_X        = 1.0e+10;          // the Schmidt number for azimuthal  diffusion
+const real  SC_R        = 1.0e10;              // the Schmidt number for radial     diffusion
+const real  SC_X        = 1.0e10;              // the Schmidt number for azimuthal  diffusion
 #endif // DIFFUSION
 
 #if (defined(TRANSPORT) && defined(DIFFUSION)) || defined(COLLISION)
@@ -109,8 +109,8 @@ const real INIT_XMAX    = X_MAX;            // maximum X boundary for particle i
 const real INIT_YMIN    = Y_MIN;            // minimum Y boundary for particle initialization
 const real INIT_YMAX    = Y_MAX;            // maximum Y boundary for particle initialization
 
-const real INIT_ZMIN    = Z_MIN;            // minimum Z boundary for particle initialization
-const real INIT_ZMAX    = Z_MAX;            // maximum Z boundary for particle initialization
+const real INIT_ZMIN    = 0.5*M_PI;            // minimum Z boundary for particle initialization
+const real INIT_ZMAX    = 0.5*M_PI;            // maximum Z boundary for particle initialization
 #endif // NOT IMPORTGAS
 
 const real INIT_SMIN    = 1.0e+00;          // minimum grain size for particle initialization
@@ -119,16 +119,16 @@ const real INIT_SMAX    = 1.0e+00;          // maximum grain size for particle i
 // =========================================================================================================================
 // time step and output parameters
 
-const int  SAVE_MAX     = 8;                // total number of outputs for mesh fields
+const int  SAVE_MAX     = 512;                // total number of outputs for mesh fields
 
-const real DT_OUT       = 1.0;
+const real DT_OUT       = 0.78125;
 
 #ifdef TRANSPORT
-const real DT_DYN       = 0.1;
+const real DT_DYN       = 0.09765625;
 #endif // TRANSPORT
 
 #if defined(LOGTIMING) || defined(LOGOUTPUT)
-const int  LOG_BASE     = 10;               // logarithmic base for time stepping (LOGTIMING) or particle output (LOGOUTPUT)
+const int  LOG_BASE     = 2;               // logarithmic base for time stepping (LOGTIMING) or particle output (LOGOUTPUT)
 #else  // LINEAR
 const int  LIN_BASE     = 1;                // save particle data every LIN_BASE iterations
 #endif // LOGTIMING || LOGOUTPUT

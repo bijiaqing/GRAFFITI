@@ -194,14 +194,11 @@ void rand_from_file (real *pos_x, real *pos_y, real *pos_z, int number, const re
 {
     std::uniform_real_distribution<real> random(0.0, 1.0);
     
-    bool enable_x = (N_X > 1);
-    bool enable_z = (N_Z > 1);
-    
     real dx =         (X_MAX - X_MIN)     / static_cast<real>(N_X);
     real dy = std::pow(Y_MAX / Y_MIN, 1.0 / static_cast<real>(N_Y));
     real dz =         (Z_MAX - Z_MIN)     / static_cast<real>(N_Z);
     
-    real idx_dim = static_cast<real>(enable_x) + static_cast<real>(enable_z) + 1.0;
+    real idx_dim = static_cast<real>(N_X > 1) + static_cast<real>(N_Z > 1) + 1.0;
     real dy_pow = std::pow(dy, idx_dim);
     
     // compute dust mass in each cell using same volume calculation as _get_grid_volume
@@ -211,7 +208,7 @@ void rand_from_file (real *pos_x, real *pos_y, real *pos_z, int number, const re
     for (int idx_z = 0; idx_z < N_Z; idx_z++)
     {
         real z0 = Z_MIN + dz*static_cast<real>(idx_z);
-        real vol_z = enable_z ? (std::cos(z0) - std::cos(z0 + dz)) : 1.0;
+        real vol_z = (N_Z > 1) ? (std::cos(z0) - std::cos(z0 + dz)) : 1.0;
         
         for (int idx_y = 0; idx_y < N_Y; idx_y++)
         {
@@ -220,7 +217,7 @@ void rand_from_file (real *pos_x, real *pos_y, real *pos_z, int number, const re
             
             for (int idx_x = 0; idx_x < N_X; idx_x++)
             {
-                real vol_x = enable_x ? dx : 1.0;
+                real vol_x = (N_X > 1) ? dx : 1.0;
                 real cell_volume = vol_x*vol_y*vol_z;
                 
                 int idx = idx_x + idx_y*N_X + idx_z*N_X*N_Y;

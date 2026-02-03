@@ -59,7 +59,7 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
 
             // maximum search distance for KNN neighbor search defined by gas scale height
             real R = y*sin(z);
-            float max_search_dist = static_cast<float>(_get_hg(R)*R);
+            float max_search_dist = static_cast<float>(H_SEARCH*_get_hg(R)*R);
             
             candidatelist query_result(max_search_dist);
             cukd::cct::knn <candidatelist, tree, tree_traits> (query_result, dev_col_tree[idx_tree].cartesian, *dev_boundbox, dev_col_tree, N_P);
@@ -68,8 +68,10 @@ void col_proc_exec (swarm *dev_particle, curs *dev_rs_swarm, real *dev_col_expt,
             real col_rand_ij = col_rate_i*curand_uniform_double(&rs_swarm);
             real col_expt_ij = 0.0;
 
+            real idx_dim = static_cast<real>(N_X > 1) + static_cast<real>(N_Z > 1) + 1.0;
+            real coeff = (idx_dim == 1) ? 2.0 : (idx_dim == 2) ? M_PI : 4.0*M_PI / 3.0;
             real radius = dev_particle[idx_old_i].max_dist;
-            real volume = (4.0/3.0)*M_PI*radius*radius*radius;
+            real volume = coeff*pow(radius, idx_dim);
 
             int idx_old_j, j = 0;
 

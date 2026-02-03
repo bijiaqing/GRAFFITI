@@ -84,10 +84,7 @@ void _1d_interp_y (real loc_y, real deci_y, real &frac_y, int &next_y, bool oute
         }
         else
         {
-            bool enable_x = (N_X > 1);
-            bool enable_z = (N_Z > 1);
-
-            real idx_dim = static_cast<real>(enable_x) + static_cast<real>(enable_z) + 1.0;
+            real idx_dim = static_cast<real>(N_X > 1) + static_cast<real>(N_Z > 1) + 1.0;
             
             // volume centroid: r_c = (D/(D+1))*(r_out^(D+1) - r_in^(D+1)) / (r_out^D - r_in^D)
             m_y = log((idx_dim / (idx_dim + 1.0))*(pow(d_y, idx_dim + 1.0) - 1.0) / (pow(d_y, idx_dim) - 1.0)) / log(d_y);
